@@ -1,0 +1,72 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "buttcrack"
+dynamic = ["version"]
+description = "A CLI for cracking classical ciphers that AI agents can drive easily"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [{ name = "diid", email = "diid@cada.art" }]
+keywords = ["cryptography", "cipher", "cryptanalysis", "classical-ciphers", "cli", "agents"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security :: Cryptography",
+]
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=7", "pytest-xdist>=3", "ruff>=0.6", "mypy>=1.8"]
+
+[project.scripts]
+butt = "buttcrack.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/0xdiid/buttcrack"
+Issues = "https://github.com/0xdiid/buttcrack/issues"
+Documentation = "https://github.com/0xdiid/buttcrack/blob/main/docs/cryptanalysis-tips.md"
+Changelog = "https://github.com/0xdiid/buttcrack/blob/main/CHANGELOG.md"
+
+[tool.hatch.version]
+path = "src/buttcrack/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/buttcrack"]
+# The english_*.txt n-gram tables under src/buttcrack/data are bundled
+# automatically as package data (they live inside the package directory).
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+markers = [
+    # Stochastic solvers bounded by a WALL-CLOCK timeout: run serially (a full core
+    # each). Fast suite: `pytest -m "not slow" -n auto`; slow: `pytest -m slow`.
+    "slow: long-running cracker tests (stochastic solvers); deselect with -m 'not slow'",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "UP", "B"]
+ignore = ["B008"]
+
+[tool.mypy]
+python_version = "3.10"
+files = ["src/buttcrack"]
+ignore_missing_imports = true
+warn_unused_ignores = true
+# Pragmatic: the cracker signatures lean on **opts/dynamic dispatch, so we check
+# annotations where present without demanding full coverage.
+check_untyped_defs = true
+disallow_untyped_defs = false

@@ -1,0 +1,920 @@
+[
+  {
+    "name": "Beaufort",
+    "category": "polyalphabetic",
+    "algorithm": "Repeating-key polyalphabetic substitution on the 26-letter alphabet (A=0..Z=25). Plaintext written into a block under the repeating key; column j (j = position mod period) uses key letter K_j. ENCRYPT each letter: C = (K - P) mod 26. DECRYPT: P = (K - C) mod 26 (identical operation, so reciprocal). Tableau method (standard 26x26 Vigenere square with rows/cols labeled A..Z): to encrypt P with key K, locate plaintext letter P along the TOP row to fix a column, travel DOWN that column to the key letter K, then move LEFT along that row to the left edge; the row label is the ciphertext. Equivalent to C=(K-P) mod 26. No I/J merging; full 26 letters. Padding: none required (stream over text); period = key length. Non-letters are skipped/passed through per convention.",
+    "key_format": "A keyword (letters only), repeated cyclically; period = keyword length.",
+    "reciprocal": true,
+    "test_vectors": [
+      {
+        "plaintext": "C equals K minus P (CEQUALSKMINUSP)",
+        "key": "RECIPROCAL",
+        "ciphertext": "PAMOP GWSOD EKKT (PAMOPGWSODEKKT)",
+        "source": "American Cryptogram Association (ACA) cipher description PDF 'BEAUFORT', cryptogram.org/downloads/aca.info/ciphers/Beaufort.pdf — verified computationally with C=(K-P) mod 26"
+      },
+      {
+        "plaintext": "DCODE",
+        "key": "KEY",
+        "ciphertext": "HCKHA",
+        "source": "dCode.fr Beaufort cipher page (dcode.fr/beaufort-cipher), C=(K-P) mod 26 with key repeated KEYKE"
+      }
+    ],
+    "reciprocal_note": "encrypt==decrypt",
+    "crack_approach": "Keyless: find the period via the Kasiski test or the per-offset Index of Coincidence (group ciphertext into N columns; the N giving columns with English-like IoC ~0.066 is the period). For each column the cipher is a constant Beaufort shift; recover each column's key letter by frequency analysis: since C=(K-P), the ciphertext frequency distribution is a REVERSED-and-shifted copy of the plaintext distribution, so correlate the reversed standard English distribution against each column to find K (chi-squared / best correlation). Equivalently hill-climb the key with an n-gram (quadgram) fitness function once the period is known.",
+    "notes": "Reciprocal because subtraction K-P is its own inverse. Distinguish from Variant Beaufort (C=P-K) and from Vigenere (C=P+K)."
+  },
+  {
+    "name": "Variant Beaufort",
+    "category": "polyalphabetic",
+    "algorithm": "Also called the 'German variant' / variant Beaufort. Repeating-key polyalphabetic substitution, A=0..Z=25, plaintext written under repeating key, column j uses key letter K_j. ENCRYPT: C = (P - K) mod 26 (this is the DECRYPT step of standard Vigenere). DECRYPT: P = (C + K) mod 26 (standard Vigenere encrypt). NOT reciprocal: encrypt and decrypt differ. Tableau method using a standard Vigenere square: to encrypt P with key K, go down the K column (left labels = key) until you find P in that column? — operationally use the ACA rule: find plaintext letter along the TOP (A,plaintext) row to fix a column, look DOWN the key letter's row... ACA states: 'look down the K (key) column for the key letter row and across the top plaintext row; where they meet is the ciphertext' giving C=(P-K) mod 26. Full 26 letters, no I/J merge, period = key length, no padding.",
+    "key_format": "A keyword (letters only), repeated cyclically; period = keyword length.",
+    "reciprocal": false,
+    "test_vectors": [
+      {
+        "plaintext": "C equals P minus K (CEQUALSPMINUSK)",
+        "key": "APPLE",
+        "ciphertext": "CPBJW LDABE NFDZ (CPBJWLDABENFDZ)",
+        "source": "ACA cipher description PDF 'VARIANT', cryptogram.org/downloads/aca.info/ciphers/Variant.pdf — verified computationally with C=(P-K) mod 26"
+      }
+    ],
+    "crack_approach": "Identical strategy to Vigenere/Beaufort: determine period by Kasiski / per-column IoC, then for each column solve a constant shift. Because C=(P-K), the column's distribution is the standard English distribution shifted by -K (NOT reversed, unlike true Beaufort), so chi-squared shift detection or correlation against English gives each K directly. Or hill-climb key with quadgram fitness once period known.",
+    "notes": "Differs from true Beaufort (C=K-P, reciprocal) by the sign: here C=P-K, not reciprocal. Encrypt of Variant Beaufort == decrypt of Vigenere."
+  },
+  {
+    "name": "Gronsfeld",
+    "category": "polyalphabetic",
+    "algorithm": "A Vigenere cipher whose key is a sequence of DIGITS 0-9 (each digit is a Caesar shift). A=0..Z=25. Write plaintext under the repeating digit key; column j uses digit d_j. ENCRYPT: C = (P + d) mod 26. DECRYPT: P = (C - d) mod 26. Because digits are 0-9, only 10 of the 26 Vigenere alphabets are ever used (rows 0-9 of the tableau). Tableau: 26-column header A..Z; rows labeled 0..9 where row r maps A->(letter r positions later). Full 26-letter alphabet, no I/J merge, no padding, period = number of digits in the key. Not reciprocal.",
+    "key_format": "A string of decimal digits (e.g. 9321492); period = number of digits.",
+    "reciprocal": false,
+    "test_vectors": [
+      {
+        "plaintext": "This one uses ten of the twenty-six Vigenere alphabets (THISONEUSESTENOFTHETWENTYSIXVIGENEREALPHABETS)",
+        "key": "9321492",
+        "ciphertext": "CKKTS WGDVG TXNPX IVIIC YNQVZ WRZEL IFRNT NDNQL JDNWU",
+        "source": "ACA cipher description PDF 'GRONSFELD', cryptogram.org/downloads/aca.info/ciphers/Gronsfeld.pdf — verified computationally with C=(P+d) mod 26"
+      },
+      {
+        "plaintext": "DEFENDTHEEAST",
+        "key": "31415",
+        "ciphertext": "GFJFSGULFJDTX",
+        "source": "dCode.fr Gronsfeld cipher page (dcode.fr/gronsfeld-cipher)"
+      }
+    ],
+    "crack_approach": "Same as Vigenere but the keyspace is tiny: each key position has only 10 possibilities (shift 0-9). Find period by Kasiski / per-column IoC (or just try periods 1..~12). For each column brute-force the 10 shifts choosing the one maximizing single-letter English fit (chi-squared). For short keys the entire key (10^len) can be brute-forced against an n-gram fitness score. Note all shifts are small (0-9), which itself is a fingerprint.",
+    "notes": "Effectively Vigenere restricted to keyletters A..J (shifts 0-9). Reciprocal only by coincidence (never, for nonzero shifts)."
+  },
+  {
+    "name": "Porta",
+    "category": "polyalphabetic",
+    "algorithm": "Della Porta periodic cipher using 13 reciprocal alphabets, each selected by a PAIR of key letters (A or B -> table 0; C or D -> table 1; ...; Y or Z -> table 12; table index = floor((keyletter-'A')/2)). Construction: split the alphabet into first half F=A..M (13 letters) and second half S=N..Z (13 letters). For table t, the second half is rotated LEFT by t: row r maps the j-th first-half letter (A..M) to S_rot[j] where S_rot = (NOPQRSTUVWXYZ rotated left t). The mapping is RECIPROCAL within each table: A..M <-> the rotated N..Z, i.e. if A..M maps to X then X maps back to A..M. ACA tableau rows (key pair : image of A B C D E F G H I J K L M): A,B->NOPQRSTUVWXYZ; C,D->OPQRSTUVWXYZN; E,F->PQRSTUVWXYZNO; G,H->QRSTUVWXYZNOP; I,J->RSTUVWXYZNOPQ; K,L->STUVWXYZNOPQR; M,N->TUVWXYZNOPQRS; O,P->UVWXYZNOPQRST; Q,R->VWXYZNOPQRSTU; S,T->WXYZNOPQRSTUV; U,V->XYZNOPQRSTUVW; W,X->YZNOPQRSTUVWX; Y,Z->ZNOPQRSTUVWXY. ENCRYPT=DECRYPT (reciprocal): for plaintext letter P under key letter K, select table t=floor((K-'A')/2); if P is in A..M output the corresponding rotated second-half letter; if P is in N..Z output the corresponding first-half letter. Full 26 letters, no I/J merge, period = keyword length, no padding. Guarantees no letter maps to itself.",
+    "key_format": "A keyword (letters); period = keyword length. Each key letter selects a table via its pair (A/B share table 0, etc.).",
+    "reciprocal": true,
+    "test_vectors": [
+      {
+        "plaintext": "encipherment is reciprocal (ENCIPHERMENTISRECIPROCAL)",
+        "key": "PORTA",
+        "ciphertext": "YGXRC OYJVR GMQJE YWQGE HWVU",
+        "source": "ACA cipher description PDF 'PORTA', cryptogram.org/downloads/aca.info/ciphers/Porta.pdf — verified computationally with the 13-table reciprocal construction"
+      },
+      {
+        "plaintext": "DCODE",
+        "key": "PORTA",
+        "ciphertext": "WVJUR",
+        "source": "dCode.fr Porta cipher page (dcode.fr/porta-cipher)"
+      }
+    ],
+    "crack_approach": "Keyless: find period by Kasiski / per-column IoC (each column is a single Porta table = constant reciprocal substitution). With period known, each column has only 13 possible tables; brute-force the 13 tables per column choosing the one giving best single-letter English frequency fit (the reciprocal A..M<->N..Z structure makes the per-column distribution a known transform of English). Or hill-climb the keyword with quadgram fitness. Dictionary keyword search is also standard (CryptoCrack).",
+    "notes": "Only 13 distinct alphabets; key letters A&B (etc.) are equivalent. Reciprocal. Note CryptoCrack/practicalcryptography use the SAME 13-table set but some references reverse the first/second-half roles; the ACA tableau above is authoritative and verified by the YGXRC vector."
+  },
+  {
+    "name": "Portax",
+    "category": "polygraphic",
+    "algorithm": "ACA digraphic periodic cipher derived from Porta, enciphering VERTICAL pairs. Slide construction (two strips): TOP strip row A1/1 (fixed) = A B C D E F G H I J K L M (13 columns); row A1/2 (sliding) = N O P Q R S T U V W X Y Z repeated. Lower strip A2 has two rows: odd row = A C E G I K M O Q S U W Y (repeated), even row = B D F H J L N P R T V X Z (repeated). The combined A2 letter sequence is ACEGIKMOQSUWYBDFHJLNPRTVXZ. For a given column the key letter sets the slide: place 'A' of A1/1 over the key letter in A2, i.e. slide offset s = index of key letter in the sequence ACEGIKMOQSUWYBDFHJLNPRTVXZ. The 13-column window then shows 4 rows: row1=A..M, row2=N..Z shifted by s, row3=odd-A2 shifted by s, row4=even-A2 shifted by s. LAYOUT: write plaintext horizontally into a block of period width; take vertical pairs (top letter from rows 1/2, bottom letter from rows 3/4 of the SAME column block — rows are paired (0,1),(2,3),(4,5)... and each text column uses the corresponding key letter). ENCIPHER each vertical pair: the top letter is found in row1 or row2, the bottom letter in row3 or row4; they are diagonally opposite corners of a rectangle; the ciphertext is the OTHER two corners with the top-row letter taken first. If the two plaintext letters lie in the same vertical column, the substitutes are the OTHER two letters on that same column. DECRYPT applies the same rectangle/slide in reverse. Full 26 letters; if final block is incomplete it is left short (partial column). Period = keyword length.",
+    "key_format": "A keyword (letters); period = keyword length. Plaintext is written under the keyword in a block; pairs are taken vertically.",
+    "reciprocal": false,
+    "test_vectors": [
+      {
+        "plaintext": "the early bird gets the worm (block under EASY: rows THEE/ARLY/BIRD/GETS/THEW/ORMX)",
+        "key": "EASY",
+        "ciphertext": "NIJAM PBGQC WKHQJ EUIKY MPAT (rows: NIJA / MPBG / QCWK / HQJE / UIKY / MPAT)",
+        "source": "ACA cipher description PDF 'PORTAX', cryptogram.org/downloads/aca.info/ciphers/Portax.pdf — verified computationally with slide offset = index in ACEGIKMOQSUWYBDFHJLNPRTVXZ"
+      },
+      {
+        "plaintext": "in (key slide for U/V)",
+        "key": "U",
+        "ciphertext": "JL",
+        "source": "ACA Portax PDF example: with slide set for key letters U/V, 'in'->JL, 'no'->UA, 'na'->DB"
+      }
+    ],
+    "crack_approach": "Known weakness (ACA): the UPPER letter of each pair is NOT Vigenere-shifted when it falls in N..Z (it stays on the fixed/sliding boundary), so if the period is known any pair whose top plaintext is N..Z is immediately readable. Keyless attack: find period (the cipher is digraphic with width = keyword length; pairs come in vertical sets so column statistics repeat every period). For each column the key letter has only 26 (effectively 13 distinct slide) possibilities; brute-force per-column slides scoring recovered plaintext digraphs/letters with English n-gram fitness, exploiting the unshifted-N..Z weakness to anchor columns. Hill-climb the keyword overall.",
+    "notes": "Pairs are vertical (read down columns of a 2-row block), output taken off by horizontal rows. Based on Porta's reciprocal half-alphabet idea but digraphic. Not reciprocal as a whole."
+  },
+  {
+    "name": "Autokey",
+    "category": "polyalphabetic",
+    "algorithm": "Vigenere-family cipher where the running key is a short primer followed by the message itself, so the key never repeats. TWO forms: (1) TEXT/PLAINTEXT autokey: keystream = PRIMER || PLAINTEXT (primer letters then the plaintext, truncated to message length). (2) KEY/CIPHERTEXT autokey: keystream = PRIMER || CIPHERTEXT (the ciphertext is fed back as it is produced). ENCRYPT (Vigenere table, the ACA default): C_i = (P_i + K_i) mod 26 where K = keystream. For plaintext autokey K_i = primer_i for i<L else P_(i-L). For ciphertext autokey K_i = primer_i for i<L else C_(i-L). DECRYPT plaintext-autokey: P_i = (C_i - K_i) mod 26, and each recovered P_i is appended to the keystream before decrypting position i+L (sequential). DECRYPT ciphertext-autokey: P_i = (C_i - K_i) where K is primer then ciphertext (key is fully known from ciphertext, can be done in parallel). The cipher may also be run with Variant, Beaufort, or Porta tables instead of Vigenere. A=0..Z=25, no I/J merge, no padding (key length adapts to message). Not reciprocal.",
+    "key_format": "A short keyword 'primer' (letters). No fixed period — the primer length only sets how far back the autokey reaches.",
+    "reciprocal": false,
+    "test_vectors": [
+      {
+        "plaintext": "The autokey can be used with Vigenere, Variant, Beaufort or Porta (THEAUTOKEYCANBEUSEDWITHVIGENEREVARIANTBEAUFORTORPORTA)",
+        "key": "PRIMER",
+        "ciphertext": "IYMMY KHRIY WTBLI SUEQX MNZZL CMGLM MBEEM RROBV IUSHS XOLUC IMO",
+        "source": "ACA cipher description PDF 'AUTOKEY' (Vigenere Autokey), cryptogram.org/downloads/aca.info/ciphers/Autokey.pdf — verified computationally with keystream = PRIMER||plaintext, C=(P+K) mod 26"
+      },
+      {
+        "plaintext": "MEETATTHEFOUNTAIN",
+        "key": "KILT",
+        "ciphertext": "WMPMMXXAEYHBRYOCA",
+        "source": "Wikipedia 'Autokey cipher' worked example (plaintext autokey, keystream KILT+MEETATTHEFOUNTAIN)"
+      }
+    ],
+    "crack_approach": "For PLAINTEXT autokey (Vigenere): exploit that the keystream is the plaintext shifted by the primer length L. Try each primer length L=1..~12; the classic attack assumes a probable high-frequency keystream word (e.g. ' THE') sliding along, since the key is English text. Equivalently, decrypt under the hypothesis that a common word is the key at some offset and look for readable plaintext; chains of correct guesses propagate. Modern: hill-climb / Gibbs sample the primer for each candidate length scoring with quadgram fitness. For CIPHERTEXT autokey the key is recoverable directly: once the primer is guessed the whole stream is determined, so brute-force the (short) primer with n-gram scoring.",
+    "notes": "Defeats Kasiski (no repeating key). ACA also defines Variant/Beaufort/Porta autokeys (swap the combiner). Distinguish primer-only key from key-autokey vs text-autokey by the feedback source."
+  },
+  {
+    "name": "Running Key",
+    "category": "polyalphabetic",
+    "algorithm": "Vigenere with a key as long as the message — a long stretch of meaningful text (e.g. a book passage) instead of a repeating keyword. A=0..Z=25. ENCRYPT (Vigenere combiner, ACA default): C_i = (P_i + K_i) mod 26 where K is the running-key text aligned 1:1 with the plaintext. DECRYPT: P_i = (C_i - K_i) mod 26. May also be run with Variant (C=P-K), Beaufort (C=K-P), or Porta combiners. No repeating period (period = message length). The ACA worked example uses a self-running key: the plaintext is split in half, the FIRST half is used as the key text to encipher the SECOND half. Full 26 letters, no I/J merge, no padding. Not reciprocal (unless Beaufort/Porta combiner is used).",
+    "key_format": "A long key text (book passage or, in the ACA self-key example, the first half of the plaintext), at least as long as the message. No period.",
+    "reciprocal": false,
+    "test_vectors": [
+      {
+        "plaintext": "ithanyoftheperiodics (second half of plaintext)",
+        "key": "THISCIPHERCANBEUSEDW (first half of plaintext, used as running key, Vigenere)",
+        "ciphertext": "BAPSP GDMXY GPRSM IVMFO (BAPSPGDMXYGPRSMIVMFO)",
+        "source": "ACA cipher description PDF 'RUNNING KEY', cryptogram.org/downloads/aca.info/ciphers/RunningKey.pdf — verified computationally with C=(P+K) mod 26"
+      }
+    ],
+    "crack_approach": "No period to find (Kasiski/IoC fail). Standard attack: both the key and plaintext are natural language, so for each ciphertext position the pair (P,K) must both be plausible English. Use digram/trigram (n-gram) analysis: slide common English words/quadgrams as candidate key fragments and simultaneously as candidate plaintext fragments, scoring the joint likelihood — the correct alignment lights up because both streams become readable. Algorithmically: dynamic-programming / beam search maximizing combined quadgram fitness of P and K, or known-plaintext/crib dragging. Much harder than periodic Vigenere; needs n-gram language models on BOTH sides.",
+    "notes": "Security comes from a non-repeating natural-language key; weakness is that the key is itself biased English, not random."
+  },
+  {
+    "name": "Quagmire I",
+    "category": "polyalphabetic",
+    "algorithm": "ACA periodic cipher = Vigenere with a KEYED PLAINTEXT alphabet (K1 type) against STRAIGHT (A-Z) ciphertext alphabets. Construction: (1) Build the keyed plaintext alphabet from a keyword by writing the keyword (dropping repeated letters) then the remaining unused letters in A-Z order, e.g. keyword SPRINGFEVER -> SPRINGFEVABCDHJKLMOQTUWXYZ. (2) An INDICATOR keyword sets the period and the per-column shifts. For each indicator letter, a straight A-Z ciphertext alphabet is written so that it is shifted to bring a chosen alignment: the indicator key is placed vertically (usually under the letter A of the keyed plaintext alphabet); the straight cipher alphabet for that column begins so that the indicator letter sits under the alignment letter. ENCRYPT: for the i-th plaintext letter (column j = i mod period), find the plaintext letter's POSITION in the keyed plaintext alphabet, then read the ciphertext letter at that position in column j's straight alphabet. Concretely, with the keyed pt alphabet KP[0..25] and column shift sh_j (derived so that indicator letter aligns under the chosen letter), C = standardAlphabet[(index_in_KP(P) + sh_j) mod 26]. DECRYPT reverses: find position of C in the straight alphabet, subtract shift, index back into KP. Full 26 letters, no I/J merge, period = indicator length, no padding.",
+    "key_format": "Two keywords: a keyword for the keyed plaintext alphabet, and an indicator keyword that sets period and column shifts (plus the alignment letter, usually A).",
+    "reciprocal": false,
+    "test_vectors": [
+      {
+        "plaintext": "The Quag One is a periodic cipher with a keyed plain alphabet run against a straight cipher alphabet",
+        "key": "alphabet keyword SPRINGFEVER -> keyed pt = SPRINGFEVABCDHJKLMOQTUWXYZ ; indicator FLOWER (period 6) aligned under A. Column straight CT alphabets (rows 1-6): WXYZABCDEFGHIJKLMNOPQRSTUV / CDEFGHIJKLMNOPQRSTUVWXYZAB / FGHIJKLMNOPQRSTUVWXYZABCDE / NOPQRSTUVWXYZABCDEFGHIJKLM / VWXYZABCDEFGHIJKLMNOPQRSTU / IJKLMNOPQRSTUVWXYZABCDEFGH",
+        "ciphertext": "QPMGQ RBUJU YIFDM PYAIF QYYJJ JHJYC JLUUT PIDVW YMFSG AESDW HIZRB LIRVC FCZPE LBPZY YJJJH WLJJL PUP",
+        "source": "ACA cipher description PDF 'QUAGMIRE I', cryptogram.org/downloads/aca.info/ciphers/QuagmireI.pdf — verified computationally column-by-column"
+      }
+    ],
+    "crack_approach": "Find period via per-column IoC (each column is a monoalphabetic substitution, so columns show English-like IoC at the right period). Quagmire I columns are all the SAME keyed plaintext alphabet shifted by different amounts; recover by: (a) determine period; (b) hill-climb / simulated-annealing over the keyed plaintext alphabet (26! reduced because columns are coupled) with quadgram fitness, OR align columns by their relative shifts (since cipher alphabets are straight, the column-to-column shifts are just the indicator differences) to collapse all columns onto one monoalphabet, then solve that monoalphabet. Dictionary attack on the two keywords is also standard.",
+    "notes": "K1 keying: keyed plaintext alphabet, straight cipher alphabets. The coupling of columns (same pt alphabet, only shift differs) makes it far weaker than 26!-per-column."
+  },
+  {
+    "name": "Quagmire II",
+    "category": "polyalphabetic",
+    "algorithm": "ACA periodic cipher = Vigenere with a STRAIGHT (A-Z) plaintext alphabet against a KEYED CIPHERTEXT alphabet (K2 type). Construction: (1) Build the keyed cipher alphabet from a keyword (keyword minus repeats, then remaining letters A-Z order), e.g. SPRINGFEVER -> SPRINGFEVABCDHJKLMOQTUWXYZ. (2) Indicator keyword sets period and column alignment: for each indicator letter, the keyed cipher alphabet is written (cyclically rotated) so the indicator letter aligns under the chosen plaintext letter (usually A). ENCRYPT: for plaintext letter P in column j, find P's position in the STRAIGHT alphabet (i.e. its ordinal), then read the letter at that position in column j's rotated KEYED cipher alphabet: C = KeyedCipherAlphabet_rotated_j[ord(P)]. DECRYPT: find C's index in column j's keyed cipher alphabet, output the straight-alphabet letter at that index. Each column's keyed cipher alphabet is the same keyed sequence rotated to a different start (rotation determined by the indicator letter). Full 26 letters, no I/J merge, period = indicator length, no padding. Not reciprocal.",
+    "key_format": "Two keywords: one for the keyed ciphertext alphabet, and an indicator keyword (with alignment letter, usually A) setting period and rotations.",
+    "reciprocal": false,
+    "test_vectors": [
+      {
+        "plaintext": "In the Quag Two a straight plain alphabet is run against a keyed cipher alphabet",
+        "key": "keyed CT alphabet SPRINGFEVER -> SPRINGFEVABCDHJKLMOQTUWXYZ ; indicator FLOWER (period 6) under plaintext A. CT alphabet rows 1-6: FEVABCDHJKLMOQTUWXYZSPRING / LMOQTUWXYZSPRINGFEVABCDHJK / OQTUWXYZSPRINGFEVABCDHJKLM / WXYZSPRINGFEVABCDHJKLMOQTU / EVABCDHJKLMOQTUWXYZSPRINGF / RINGFEVABCDHJKLMOQTUWXYZSP",
+        "ciphertext": "JICIC OSLYK ILFVC HEBDX CCORJ IOEWA FMWKK TXBGW HRJIB KEDBJ WZABU XWHEH UXOXC U",
+        "source": "ACA cipher description PDF 'QUAGMIRE II', cryptogram.org/downloads/aca.info/ciphers/QuagmireII.pdf — verified computationally column-by-column"
+      }
+    ],
+    "crack_approach": "Find period by per-column IoC (each column monoalphabetic). All columns share the SAME keyed cipher alphabet, only the rotation (start point) differs by indicator letter. Recover by hill-climbing the keyed cipher alphabet with quadgram fitness, or by aligning columns: determine each column's rotation, collapse all columns onto one keyed-alphabet substitution, then solve that single substitution (keyed alphabet often reveals a dictionary word). Dictionary search over the keyword + indicator is standard (CryptoCrack).",
+    "notes": "K2 keying: straight plaintext alphabet, keyed cipher alphabet (rotated per column). Mirror image of Quagmire I."
+  },
+  {
+    "name": "Quagmire III",
+    "category": "polyalphabetic",
+    "algorithm": "ACA periodic cipher using the SAME keyed alphabet for BOTH plaintext and ciphertext (K3 type). Construction: (1) Build one keyed alphabet from a keyword (keyword minus repeats then remaining letters A-Z order), e.g. AUTOMOBILE -> AUTOMBILECDFGHJKNPQRSVWXYZ. Use it as BOTH the plaintext header row and the basis of every cipher row. (2) Indicator keyword sets period; it is written under a chosen letter of the keyed plaintext alphabet (in the example, under A). For each indicator letter, the keyed alphabet is cyclically rotated so that the indicator letter sits under the alignment letter, forming that column's cipher row. ENCRYPT: for plaintext letter P in column j, find its POSITION in the keyed plaintext alphabet (header), then output the letter at that position in column j's rotated keyed cipher row. DECRYPT: find C's position in column j's cipher row, output the keyed-alphabet header letter at that position. Full 26 letters, no I/J merge, period = indicator length, no padding. Not reciprocal.",
+    "key_format": "Two keywords: one keyword generating the single keyed alphabet (used for both pt and ct), and an indicator keyword (with alignment letter) setting the period and per-column rotations.",
+    "reciprocal": false,
+    "test_vectors": [
+      {
+        "plaintext": "The same keyed alphabet is used for plain and cipher alphabets (THESAMEKEYEDALPHABETISUSEDFORPLAINANDCIPHERALPHABETS)",
+        "key": "keyed alphabet AUTOMOBILE -> AUTOMBILECDFGHJKNPQRSVWXYZ ; indicator HIGHWAY (period 7) under plaintext A. Cipher rows 1-7: HJKNPQRSVWXYZAUTOMBILECDFG / ILECDFGHJKNPQRSVWXYZAUTOMB / GHJKNPQRSVWXYZAUTOMBILECDF / HJKNPQRSVWXYZAUTOMBILECDFG / WXYZAUTOMBILECDFGHJKNPQRSV / AUTOMBILECDFGHJKNPQRSVWXYZ / YZAUTOMBILECDFGHJKNPQRSVWX",
+        "ciphertext": "KRSLW MITJD VIABM RGQMT MLLIV IFUIX RHTNY ONVRH HIIIR MCAOV EI",
+        "source": "ACA cipher description PDF 'QUAGMIRE III', cryptogram.org/downloads/aca.info/ciphers/QuagmireIII.pdf — verified computationally column-by-column"
+      }
+    ],
+    "crack_approach": "Find period by per-column IoC. Both pt and ct use the same keyed alphabet, so all columns are rotations of one keyed substitution — recover by hill-climb / simulated annealing over the single keyed alphabet (plus the per-column rotations from the indicator) scoring with quadgrams. The classic ACA hand method: solve as a Vigenere-like array, find the indicator shifts, then determine the keyed alphabet that makes columns read as English. Dictionary keyword + indicator search is standard.",
+    "notes": "K3 keying: identical keyed alphabet for plaintext and ciphertext. A Quagmire III with the indicator equal to the keyword degenerates toward a Vigenere-of-keyed-alphabet."
+  },
+  {
+    "name": "Quagmire IV",
+    "category": "polyalphabetic",
+    "algorithm": "ACA periodic cipher with THREE keywords (K4 type): a keyed PLAINTEXT alphabet, a DIFFERENT keyed CIPHERTEXT alphabet, and an indicator keyword. Construction: (1) keyed plaintext alphabet from keyword 1 (e.g. SENSORY -> SENORYABCDFGHIJKLMPQTUVWXZ). (2) keyed ciphertext alphabet from keyword 2 (e.g. PERCEPTION -> PERCTIONABDFGHJKLMQSUVWXZ... built as PERCTION then remaining = PERCTIONABDFGHJKLMQSUVWXYZ-style; the ACA example yields the base cipher sequence used in its rows). (3) Indicator keyword (e.g. EXTRA, period 5) written under a chosen letter of the keyed plaintext alphabet (under S in the example); for each indicator letter the keyed CIPHER alphabet is rotated so the indicator letter aligns under the chosen plaintext letter, forming that column's cipher row. ENCRYPT: for plaintext letter P in column j, find P's POSITION in the keyed PLAINTEXT alphabet, output the letter at that position in column j's rotated keyed CIPHER row. DECRYPT: find C's index in column j's cipher row, output the keyed-plaintext-alphabet letter at that index. Full 26 letters, no I/J merge, period = indicator length, no padding. Not reciprocal. Most general Quagmire (Quagmire I=straight cipher alpha, II=straight plain alpha, III=same alpha both; IV=two different keyed alphabets).",
+    "key_format": "Three keywords: keyword for keyed plaintext alphabet, keyword for keyed ciphertext alphabet, and an indicator keyword (with alignment letter) setting period and rotations.",
+    "reciprocal": false,
+    "test_vectors": [
+      {
+        "plaintext": "This one employs three keywords (THISONEEMPLOYSTHREEKEYWORDS)",
+        "key": "keyed pt alphabet from SENSORY -> SENORYABCDFGHIJKLMPQTUVWXZ ; keyed ct alphabet from PERCEPTION ; indicator EXTRA (period 5) under plaintext S. Cipher rows 1-5: ERCTIONABDFGHJKLMQSUVWXYZP / XYZPERCTIONABDFGHJKLMQSUVW / TIONABDFGHJKLMQSUVWXYZPERC / RCTIONABDFGHJKLMQSUVWXYZPE / ABDFGHJKLMQSUVWXYZPERCTION",
+        "ciphertext": "VBMRF CYISP MPBRR HEICX RREIG DX",
+        "source": "ACA cipher description PDF 'QUAGMIRE IV', cryptogram.org/downloads/aca.info/ciphers/QuagmireIV.pdf — verified computationally column-by-column"
+      }
+    ],
+    "crack_approach": "Hardest Quagmire (two independent 26-letter keyed alphabets + indicator). Find period by per-column IoC. Then either (a) two-stage hill-climb / simulated annealing: alternately optimize the keyed plaintext alphabet and keyed cipher alphabet with quadgram fitness while the indicator gives column rotations; or (b) recover relative column shifts, collapse columns onto a single composite substitution (composition of the two keyed alphabets), solve that substitution, then factor. Dictionary search over all keywords + indicator when keywords are dictionary words. Needs more ciphertext (ACA recommends period x 25-30 lines).",
+    "notes": "K4 keying: different keyed alphabets for plaintext and ciphertext. Generalizes I/II/III."
+  },
+  {
+    "name": "Slidefair",
+    "category": "polygraphic",
+    "algorithm": "ACA periodic DIGRAPHIC cipher combining Playfair-style pairing with a Vigenere/Variant/Beaufort slide. A keyword sets the period (= keyword length). Plaintext is split into DIGRAPHS; if odd length, pad with X. For digraph i, use key letter k = keyword[i mod period]. Use an 'abbreviated table' = two rows: top row = straight A..Z; bottom row depends on table type — Vigenere: bottom = A..Z (so cell shift = +index); Variant: bottom = ZABC...Y; Beaufort: bottom = BAZYX...C (reversed pattern). MECHANIShM (Vigenere table): the first plaintext letter P1 is located in the TOP row; the second letter P2 is located in the bottom alphabet for key letter k. They are diagonally opposite corners of a rectangle; the ciphertext is the OTHER two corners, top letter taken first. This reduces to: C1 = (P2 - k) mod 26, C2 = (P1 + k) mod 26 (verified). SAME-COLUMN special case: if the two plaintext letters form a vertical pair in the strips (i.e. (P1 + k) mod 26 == P2), the ciphertext is the pair just to the RIGHT: C1 = (P1 + 1) mod 26, C2 = (P2 + 1) mod 26. For VARIANT table use the variant combiner; for BEAUFORT table the first plaintext letter is enciphered (Beaufort) as the SECOND ciphertext letter and vice-versa. Full 26 letters, no I/J merge. DECRYPT uses the same rectangle but reverses direction (and moves LEFT for the same-column case), so it is NOT perfectly reciprocal.",
+    "key_format": "A keyword (letters) setting the period; choice of table (Vigenere [ACA default], Variant, or Beaufort).",
+    "reciprocal": false,
+    "test_vectors": [
+      {
+        "plaintext": "The Slidefair can be used with Vigenere, Variant or Beaufort (digraphs TH ES LI DE FA IR CA NB EU SE DW IT HV IG EN ER EV AR IA NT OR BE AU FO RT)",
+        "key": "DIGRAPH (Vigenere table)",
+        "ciphertext": "EW KM CR NU AF CX TJ YQ MM YY FU TI GW ZP KH JM PK BS AI EC KV CF MI IL CI",
+        "source": "ACA cipher description PDF 'SLIDEFAIR', cryptogram.org/downloads/aca.info/ciphers/Slidefair.pdf — verified computationally with C1=(P2-k), C2=(P1+k), vertical-pair shift-right rule"
+      },
+      {
+        "plaintext": "ca (key letter B, Vigenere/Variant/Beaufort)",
+        "key": "B",
+        "ciphertext": "ZD (Vigenere), BB (Variant), BZ (Beaufort)",
+        "source": "ACA Slidefair PDF table-of-examples: with key B, pt 'ca' -> ZD/BB/BZ and 'de' -> EF/FC/XY"
+      }
+    ],
+    "crack_approach": "Digraphic + periodic. Find period via per-column digraph statistics: split digraphs by their key position (i mod period); each position is a constant-shift Slidefair (a fixed digraph substitution). For each column the key letter has only 26 possibilities; brute-force per-column key letters scoring recovered plaintext with digram/quadgram English fitness, exploiting that each column is essentially a Vigenere-shift on a reordered pair. Or hill-climb the keyword with n-gram fitness. Knowing the table type (Vigenere/Variant/Beaufort) is part of the search (try all three).",
+    "notes": "Pairs from the message (consecutive letters), not vertical like Portax. The vertical-pair (same-column) rule shifts both ciphertext letters one to the right. Beaufort table swaps which plaintext letter feeds which ciphertext position."
+  },
+  {
+    "name": "Playfair cipher",
+    "category": "polygraphic",
+    "algorithm": "KEY SQUARE: Build a 5x5 grid (25 cells) from a keyword. Write the keyword left-to-right, top-to-bottom, dropping any repeated letters; then fill remaining cells with the rest of the alphabet in order. The alphabet is reduced to 25 letters: merge I and J into one cell (treat J as I; the cell is usually printed 'I/J'). Some variants instead drop Q. PLAINTEXT PREP: Uppercase, strip non-letters, J->I. Break into digraphs left to right. If both letters of a digraph are identical, insert a padding letter (conventionally X, or Q) between them and re-pair, so the double is split (e.g. 'BALLOON' -> BA LX LO ON). If the final digraph is a lone letter, append a padding letter (X) to complete it. ENCRYPT each digraph (a,b) using positions in the square: (1) Same row: replace each letter with the letter immediately to its right, wrapping from the rightmost column back to the leftmost. (2) Same column: replace each letter with the letter immediately below, wrapping from the bottom row to the top. (3) Rectangle (different row and column): replace each letter with the letter in its own row but in the column of the other letter (i.e. swap columns, keep rows). DECRYPT: identical procedure but shift LEFT for same-row and UP for same-column (with wrap); the rectangle rule is unchanged (self-inverse). Note decryption does not remove inserted X nulls or trailing X; the reader strips them by context.",
+    "key_format": "A single keyword or key phrase (letters only). Produces a 5x5 keyed mixed alphabet. Effective key space ~25!/2 ~ 7.9e24 distinct squares (squares differing only by row/column cyclic shifts and certain symmetries are equivalent for encryption).",
+    "reciprocal": false,
+    "test_vectors": [
+      {
+        "plaintext": "hide the gold in the tree stump",
+        "key": "playfair example",
+        "ciphertext": "BMODZBXDNABEKUDMUIXMMOUVIF",
+        "source": "Wikipedia, 'Playfair cipher' (en.wikipedia.org/wiki/Playfair_cipher). Square: P L A Y F / I R E X M / B C D G H / K N O S T / U V W Z Q. Prepared plaintext HI DE TH EG OL DI NT HE TR EX ES TU MP (X inserted between the EE of 'tree'). Ciphertext often shown grouped as BMODZ BXDNA BEKUD MUIXM MOUVI F."
+      }
+    ],
+    "crack_approach": "Keyless: digraph frequency analysis plus stochastic optimization over the 5x5 square. Standard method = simulated annealing (or shotgun hill-climbing) on a candidate key square, scoring decrypted text with log quadgram (4-gram) statistics of the target language; perturb by swapping two letters / swapping rows or columns / reflecting the square, accept improvements and (for SA) occasional worse moves per a cooling schedule. Reliable on roughly 100+ characters (200-300 for confident recovery). Exploits the structural invariant that a plaintext digraph and its reverse encrypt to ciphertext digraphs that are reverses of each other, and that no letter ever maps to itself within a pair. Reference: practicalcryptography.com 'Cryptanalysis of the Playfair cipher'."
+  },
+  {
+    "name": "Two-Square cipher (double Playfair)",
+    "category": "polygraphic",
+    "algorithm": "Build TWO independent 5x5 keyed squares (each from its own keyword, same construction as Playfair: dedup keyword then remaining alphabet, J merged into I, 25 letters). The two squares are arranged either VERTICALLY (square 1 on top, square 2 on bottom) or HORIZONTALLY (square 1 left, square 2 right). PLAINTEXT PREP: uppercase, J->I, split into digraphs; pad the final lone letter with X. Unlike Playfair, double letters are ALLOWED (no internal null insertion required) and a letter CAN encrypt to itself. ENCRYPT digraph (a,b) -- VERTICAL variant: find a in the TOP square and b in the BOTTOM square; they are opposite corners of a rectangle. Ciphertext = the other two corners, taking the letter from the TOP square first and the letter from the BOTTOM square second. SPECIAL CASE: if a and b fall in the same COLUMN, the rectangle is degenerate and the digraph passes through UNCHANGED (a transparency). HORIZONTAL variant: a in LEFT square, b in RIGHT square; ciphertext is the opposite corners (left-square letter first); if a and b share the same ROW the convention is to reverse them (some implementations leave them unchanged). DECRYPT: the procedure is fully symmetric (reciprocal) for the rectangle case -- apply the identical rectangle rule to the ciphertext digraph to recover plaintext. (The transparency case is its own inverse.) About 20% of digraphs are transparencies, which is the cipher's main weakness.",
+    "key_format": "Two keywords (one per square). Vertical or horizontal layout is a fixed convention agreed in advance. Key space ~ (25!)^2 but heavily reduced in practice by the transparency leakage.",
+    "reciprocal": true,
+    "test_vectors": [
+      {
+        "plaintext": "help me obi wan kenobi",
+        "key": "EXAMPLE (top) ; KEYWORD (bottom), vertical arrangement",
+        "ciphertext": "HE DL XW SD JY AN HO TK DG",
+        "source": "Wikipedia, 'Two-square cipher' (en.wikipedia.org/wiki/Two-square_cipher), vertical example. Top square (EXAMPLE): E X A M P / L B C D F / G H I J K / N O R S T / U V W Y Z. Bottom square (KEYWORD): K E Y W O / R D A B C / F G H I J / L M N P S / T U V X Z. Prepared digraphs: HE LP ME OB IW AN KE NO BI. Note 'HE' and 'AN' are transparencies (same column) -> unchanged."
+      },
+      {
+        "plaintext": "help me obi wan kenobi",
+        "key": "example (left) ; keyword (right), horizontal arrangement",
+        "ciphertext": "XGOAMELQAIREMGPLHB",
+        "source": "crypto.interactive-maths.com 'Two-Square Cipher' (Crypto Corner), horizontal worked example (shown as 'XGOA ME LQA IRE MGPLHB'). Same two keyword squares as the Wikipedia example but placed side by side. The same Crypto Corner page also lists the vertical result 'HECM XW SRK YXP HWNODG' for the differently-grouped digraph reading; the Wikipedia digraphing above is the canonical one."
+      }
+    ],
+    "crack_approach": "Keyless: hill-climbing / simulated annealing over the pair of squares, scoring decrypted text with quadgram (or digraph) log-likelihood; perturb by swapping letters within either square. The ~20% transparency rate (digraphs that copy straight through) gives a strong statistical foothold: matching transparent digraphs to common English digraphs reveals same-column constraints linking the two squares. Cribs/known plaintext dramatically accelerate recovery; if one keyword is known the other is found by search. Reference: CryptoCrack user guide 'Two Square' (solving methods: Hill Climbing and dictionary keyword search)."
+  },
+  {
+    "name": "Four-Square cipher",
+    "category": "polygraphic",
+    "algorithm": "Use FOUR 5x5 squares laid out in a 2x2 block. TOP-LEFT and BOTTOM-RIGHT are PLAINTEXT squares containing the straight alphabet (a..z with I/J merged, or Q dropped) in normal reading order. TOP-RIGHT and BOTTOM-LEFT are CIPHERTEXT squares, each a keyed mixed alphabet built from its own keyword (dedup keyword then remaining alphabet, J->I). PLAINTEXT PREP: uppercase, J->I, split into digraphs; pad a trailing lone letter with X. Doubles are allowed (no internal nulls needed). ENCRYPT digraph (a,b): locate a in the TOP-LEFT (plaintext) square and b in the BOTTOM-RIGHT (plaintext) square. These mark opposite corners of a rectangle spanning all four squares. The ciphertext is the OTHER two corners: the first ciphertext letter is read from the TOP-RIGHT square (same row as a, same column as b) and the second from the BOTTOM-LEFT square (same row as b, same column as a). DECRYPT: locate the first ciphertext letter in the TOP-RIGHT square and the second in the BOTTOM-LEFT square; read the opposite corners from the two plaintext squares (top-left gives first plaintext letter, bottom-right gives second). Encryption and decryption use different square pairs, so the operation is NOT identical, but each is the clean inverse of the other. There is no same-row/same-column special case because the two letters always come from different squares.",
+    "key_format": "Two keywords (one for the top-right ciphertext square, one for the bottom-left ciphertext square). The two plaintext squares are fixed straight alphabets. Key space ~ (25!)^2.",
+    "reciprocal": false,
+    "test_vectors": [
+      {
+        "plaintext": "help me obi wan kenobi",
+        "key": "EXAMPLE (top-right square) ; KEYWORD (bottom-left square)",
+        "ciphertext": "FYGMKYHOBXMFKKKIMD",
+        "source": "Wikipedia, 'Four-square cipher' (en.wikipedia.org/wiki/Four-square_cipher) and practicalcryptography.com 'Four-Square Cipher'. Top-left & bottom-right = plaintext a b c d e / f g h i j / k l m n o / p r s t u / v w x y z (Q omitted variant). Top-right (EXAMPLE): E X A M P / L B C D F / G H I J K / N O R S T / U V W Y Z. Bottom-left (KEYWORD): K E Y W O / R D A B C / F G H I J / L M N P S / T U V X Z. Prepared digraphs HE LP ME OB IW AN KE NO BI -> FY GM KY HO BX MF KK KI MD."
+      }
+    ],
+    "crack_approach": "Keyless: simulated annealing / hill-climbing over the two keyed ciphertext squares (the plaintext squares are fixed), scoring candidate decryptions with quadgram log-likelihood; perturb by swapping two letters within a ciphertext square, swapping rows/columns, etc. Because both plaintext squares are the known straight alphabet, the search space per square is the keyed mixed alphabet only, and digraph frequencies of the language drive convergence. Cribs/known keywords accelerate it greatly. Stronger than Playfair (no self-encryption pattern, no fixed reversal symmetry) so it needs more ciphertext."
+  },
+  {
+    "name": "Hill cipher (2x2)",
+    "category": "polygraphic",
+    "algorithm": "Map letters A..Z -> 0..25. KEY = a 2x2 integer matrix K (entries mod 26) whose determinant det(K) = (K11*K22 - K12*K21) mod 26 is coprime to 26 (i.e. odd and not divisible by 13), so K is invertible mod 26. ENCRYPT: split plaintext into 2-letter blocks (pad the last block with a null, e.g. X, if the length is odd). Write each block as a COLUMN vector p = (p1,p2)^T. Compute c = K p mod 26, convert back to letters. DECRYPT: compute K^-1 mod 26 = (det^-1 mod 26) * adj(K) mod 26, where for a 2x2 matrix [[a,b],[c,d]] the adjugate is [[d,-b],[-c,a]] and det^-1 is the modular inverse of det(K) mod 26. Then p = K^-1 c mod 26. (Row-vector * matrix conventions also exist; fix one. The example below uses K times column vector.)",
+    "key_format": "A 2x2 matrix of integers 0..25, often derived from a 4-letter keyword (letter->number filled row by row), constrained so gcd(det, 26) = 1.",
+    "reciprocal": false,
+    "test_vectors": [
+      {
+        "plaintext": "HELP",
+        "key": "K = [[3,3],[2,5]]",
+        "ciphertext": "HIAT",
+        "source": "Wikipedia, 'Hill cipher' / Crypto Corner 'Hill Cipher' worked example. Blocks HE=(7,4)^T -> [[3,3],[2,5]](7,4)=(33,38)=(7,12) mod 26 = HI ; LP=(11,15)^T -> (78,97)=(0,19) mod 26 = AT. det = 15-6 = 9, 9^-1 mod 26 = 3, inverse key = 3*[[5,-3],[-2,3]] = [[15,17],[20,9]] mod 26, which decrypts HIAT back to HELP."
+      }
+    ],
+    "crack_approach": "Known-plaintext is trivial: 2 plaintext/ciphertext digraphs giving an invertible plaintext matrix P solve K = C P^-1 mod 26. Keyless (ciphertext-only): brute force is feasible -- only ~157,248 invertible 2x2 matrices mod 26 -- decrypt under each and rank by quadgram/digraph log-likelihood; or run hill-climbing over matrix entries. Frequency analysis of digraphs also works because the map is linear and digraph-preserving in structure."
+  },
+  {
+    "name": "Hill cipher (3x3)",
+    "category": "polygraphic",
+    "algorithm": "Map letters A..Z -> 0..25. KEY = a 3x3 integer matrix K (entries mod 26) with det(K) mod 26 coprime to 26 (not divisible by 2 or 13). ENCRYPT: split plaintext into 3-letter blocks (pad final short block with nulls, e.g. X). Each block is a COLUMN vector p=(p1,p2,p3)^T; compute c = K p mod 26; convert to letters. DECRYPT: compute K^-1 mod 26 = (det^-1 mod 26) * adj(K) mod 26, where adj(K) is the transpose of the cofactor matrix; det^-1 is the modular inverse of det(K) mod 26. Then p = K^-1 c mod 26.",
+    "key_format": "A 3x3 matrix of integers 0..25 (often from a 9-letter keyword filled row by row), constrained so gcd(det, 26) = 1.",
+    "reciprocal": false,
+    "test_vectors": [
+      {
+        "plaintext": "ACT",
+        "key": "K = [[6,24,1],[13,16,10],[20,17,15]]",
+        "ciphertext": "POH",
+        "source": "Wikipedia, 'Hill cipher' (en.wikipedia.org/wiki/Hill_cipher). ACT=(0,2,19)^T. K*(0,2,19)=(67,222,319)=(15,14,7) mod 26 = POH. det(K)=441=25 mod 26 (coprime to 26). Inverse K^-1 = [[8,5,10],[21,8,21],[21,12,8]] mod 26, which maps POH=(15,14,7)^T -> (260,574,539)=(0,2,19)=ACT. The same key sends CAT=(2,0,19)^T -> (31,216,325)=(5,8,13)=FIN."
+      }
+    ],
+    "crack_approach": "Known-plaintext: 3 plaintext/ciphertext trigraphs forming an invertible plaintext matrix P give K = C P^-1 mod 26 directly. Keyless (ciphertext-only) is the hard case for 3x3: the matrix space (~26^9 with the invertibility constraint) is too large to brute-force naively, so use hill-climbing / simulated annealing over matrix entries scored by quadgram fitness, or exploit any crib. Trigraph frequency statistics and the linearity of the map (sums of plaintext map to sums of ciphertext) provide algebraic shortcuts when partial known plaintext is available."
+  },
+  {
+    "name": "Seriated Playfair cipher",
+    "category": "polygraphic",
+    "algorithm": "Uses a SINGLE 5x5 keyed Playfair square (built exactly as in standard Playfair: dedup keyword then remaining alphabet, J merged into I). KEY also includes a PERIOD N. PLAINTEXT PREP: uppercase, strip non-letters, J->I. Write the plaintext into TWO rows, filling N letters across the top row then the next N letters across the bottom row, then the next N on a new top row, and so on (the text is 'seriated' into period-N blocks stacked in pairs of rows). ENCRYPT: form digraphs VERTICALLY -- each column of a stacked pair (top-row letter, bottom-row letter) is one digraph. Encipher each vertical digraph with the standard Playfair rules (same row -> shift right with wrap; same column -> shift down with wrap; rectangle -> swap columns keep rows). DOUBLE-LETTER handling: if a vertical pair would be two identical letters, insert a null (X) -- which shifts subsequent letters -- so identical verticals never occur. END/PADDING: if the last block is short, append a null (X) to complete the final vertical pair / fill the period. The ciphertext is then read off, typically column by column within each seriated block, preserving the two-row layout. DECRYPT: rebuild the two-row seriated layout from the ciphertext using the same period, apply inverse Playfair (shift left / shift up; rectangle unchanged) to each vertical digraph, then read the plaintext across the rows; strip nulls by context.",
+    "key_format": "A Playfair keyword (defines the 5x5 square) PLUS an integer period N (the seriation width, ACA convention typically chosen so the message is 10-15 groups). Two separable key components.",
+    "reciprocal": false,
+    "test_vectors": [
+      {
+        "plaintext": "No man's cipher is worth looking at unless the inventor has himself solved a very difficult cipher",
+        "key": "keyword SERIATEDPLAYFAIR, period 7",
+        "ciphertext": "FSFGSCI EIVDROM QSWEFRL BRPARXN IPFYKKM AKHILXO GREEPFI LMURKYM IBITFLO EAYKAXD ZDLSURP DBEHBAN VPLFADF SIUPGRG QBRFEAS MDIECDQ RGQZ",
+        "source": "CryptoCrack user guide, 'Seriated Playfair' (sites.google.com/site/cryptocrackprogram/.../seriated-playfair). Plaintext seriated at period 7 into two-row blocks (top row: babbage manscip rthlook lessthe rhashim vedaver ultciph odebrea ah ; bottom row: sruleno heriswo ingatun invento selfsol ydiffic erxthec kersbyk nx), then each vertical pair enciphered by Playfair under the SERIATEDPLAYFAIR square (J->I). Definition also given in H. F. Gaines, 'Cryptanalysis' (1939)."
+      }
+    ],
+    "crack_approach": "Keyless: first determine the PERIOD N (e.g. by trying candidate periods and measuring digraph/quadgram fitness, or via repetition spacing), then hill-climb / simulated-anneal the single 5x5 square exactly as for standard Playfair, scoring the period-reconstructed plaintext with quadgram log-likelihood. Two nested searches (period then square) or a combined search. The seriation breaks the fixed adjacency of normal Playfair digraphs, so more ciphertext is needed than for plain Playfair; correct period choice is the critical first step and is itself testable by fitness."
+  },
+  {
+    "name": "Bifid",
+    "category": "fractionation",
+    "algorithm": "KEY/SQUARE: Build a 5x5 Polybius square from a keyed mixed alphabet of 25 letters (J merged into I; i.e. replace every J in plaintext with I before enciphering). Fill the square with the keyword (deduplicated) followed by the remaining unused letters; ACA standard fills it row-by-row, but spiral/other fills are also used (the ACA example uses keyword EXTRAORDINARY written in a clockwise spiral starting top-left). Number rows 1-5 and columns 1-5. Each letter L has coordinates (r,c) = (row,col), 1-indexed.\n\nENCRYPT: (1) Choose a period P (typically 5-13; odd periods slightly stronger). (2) Strip non-letters, J->I, then split plaintext into consecutive blocks of length P (the final block may be shorter; no padding is required — work the short block at its actual length). (3) Within EACH block independently: under each letter write its two coordinates VERTICALLY, i.e. write the row digit in an upper row and the column digit in a lower row beneath the letter. (4) Read the digits of the block HORIZONTALLY: first all the row digits of the block left-to-right, then all the column digits of the block left-to-right, producing a single sequence of 2P digits (or 2*len for a short block). (5) Take that digit sequence in consecutive PAIRS (d1,d2); each pair is (row,col) and is converted back through the SAME square to a ciphertext letter. Concatenate across all blocks. Ciphertext length = plaintext length.\n\nDECRYPT: For each block of P ciphertext letters, convert each letter to its (row,col) pair and lay the 2P resulting digits out as a single horizontal sequence. Split that sequence into two halves: the first P digits are the original row digits, the second P digits are the original column digits. Re-pair position-wise: plaintext letter i has coordinates (firstHalf[i], secondHalf[i]); look it up in the square. Handle a short final block by using its actual length L (2L digits, first L = rows, second L = cols).",
+    "key_format": "A keyword (or keyphrase) used to build one 5x5 keyed alphabet (25 letters, J->I), PLUS an integer period P. Fill convention (row-by-row vs spiral) must be agreed; ACA example uses a clockwise spiral.",
+    "reciprocal": false,
+    "test_vectors": [
+      {
+        "plaintext": "Odd periods are popular  (oddperiodsarepopular)",
+        "key": "Square keyword EXTRAORDINARY written clockwise-spiral into 5x5 (J->I); period = 7",
+        "ciphertext": "MWEIN GIMGE OYYRL VEYWY",
+        "source": "American Cryptogram Association, official cipher description sheet 'BIFID', cryptogram.org/downloads/aca.info/ciphers/Bifid.pdf (page 37). Square rows: E X T R A / K L M P O / H W Z Q D / G V U S I / F C B Y N. pt coords rows 2332114 2341112 2242 11, cols 5554145 5545414 5432 54."
+      },
+      {
+        "plaintext": "FLEEATONCE",
+        "key": "Wikipedia mixed square (rows: BGWKZ / QPNDS / IOAXE / FCLUM / THYVR), I/J merged; period = whole message (10)",
+        "ciphertext": "UAEOLWRINS",
+        "source": "Wikipedia, 'Bifid cipher' (en.wikipedia.org/wiki/Bifid_cipher). Coords: F=41 L=43 E=33 E=33 A=31 T=51 O=32 N=23 C=42 E=35; row-string 4433351324, col-string 1355312325; pairs 44 33 35 13 24 13 55 31 23 25 -> U A E O L W R I N S."
+      }
+    ],
+    "crack_approach": "Keyless: (1) Find the period. For a guessed period P, the ciphertext can be 'un-fractionated' and statistics tested; the standard signal is that the correct period maximizes a fitness metric. Common method: for each candidate period P, hill-climb / simulated-anneal the 25-letter key square to maximize plaintext n-gram (quadgram) log-probability (practicalcryptography approach). (2) Because every ciphertext letter depends on two plaintext letters, periodic Index of Coincidence and the 'even-position/odd-position' digit structure leak the period: for the right P, the distribution of recovered digraphs/letters is markedly non-flat. (3) Once P is fixed, simulated annealing over the square (swap two letters per step) with quadgram fitness recovers the alphabet; restart from multiple random squares to escape local optima. Short messages (<~80) are hard; ~100+ letters at a known period are routinely solvable.",
+    "notes": "Invented ~1901 by Felix Delastelle. Digraphic (each cipher letter depends on 2 plaintext letters). Pad is generally NOT used; short final block is processed at its true length. The fill rule (row-by-row vs spiral) and J->I must be agreed out-of-band."
+  },
+  {
+    "name": "Conjugated Bifid (CM Bifid)",
+    "category": "fractionation",
+    "algorithm": "Identical fractionation to standard Bifid but uses TWO different 5x5 keyed squares: Square A (the 'plaintext' / first matrix) and Square B (the 'ciphertext' / second matrix). Both are 25-letter squares with J->I.\n\nKEY/SQUARES: Square A is built from keyword 1 (ACA example: EXTRA + remaining letters, filled row-by-row -> E X T R A / K L M P O / H W Z Q D / G V U S I / F C B Y N). Square B is built from keyword 2 (ACA example: NOVELTY) written in 'alternating verticals' — i.e. the keyed alphabet is entered down alternating columns (boustrophedon by column) rather than across rows, yielding -> N C D R S / O B F Q U / V A G P W / E Y H M X / L T I K Z. Both squares are numbered rows 1-5, cols 1-5.\n\nENCRYPT: (1) Pick period P. (2) Strip non-letters, J->I, split into blocks of length P. (3) For each block, look up each plaintext letter's (row,col) in SQUARE A and write the two coordinates vertically (rows on top, cols below). (4) Read horizontally: all P row digits then all P col digits = 2P digit sequence. (5) Take consecutive digit PAIRS (row,col) and convert each pair to a letter using SQUARE B (the conjugate matrix) — THIS is the only difference from plain Bifid. Concatenate. Ciphertext length = plaintext length.\n\nDECRYPT: For each P-block, convert each ciphertext letter to (row,col) via SQUARE B, lay out the 2P digits horizontally, split into first-P (rows) and second-P (cols), re-pair position-wise, and look up each plaintext letter (rows[i],cols[i]) in SQUARE A.",
+    "key_format": "TWO keywords -> two distinct 5x5 keyed squares (J->I), plus a period P. The two squares may use different fill conventions (ACA: Square A row-by-row, Square B entered in alternating verticals/columns).",
+    "reciprocal": false,
+    "test_vectors": [
+      {
+        "plaintext": "Odd periods are popular  (oddperiodsarepopular)",
+        "key": "Square A keyword EXTRA (row-fill): E X T R A / K L M P O / H W Z Q D / G V U S I / F C B Y N.  Square B keyword NOVELTY entered in alternating verticals: N C D R S / O B F Q U / V A G P W / E Y H M X / L T I K Z.  Period = 7.",
+        "ciphertext": "FANXZEX FENUKKR BYNKAK",
+        "source": "American Cryptogram Association, official cipher description sheet 'CM BIFID (Conjugated Matrix Bifid)', cryptogram.org/downloads/aca.info/ciphers/CMBifid.pdf (page 42). Same row/col coords as the Bifid example (rows 2332114/2341112/224211, cols 5554145/5545414/543254); digit pairs 23 32 11 45 55 41 45 / 23 41 11 25 54 54 14 / 22 42 11 54 32 54 read out of SQUARE B give F A N X Z E X / F E N U K K R / B Y N K A K."
+      }
+    ],
+    "crack_approach": "Keyless: harder than plain Bifid because two independent 25-letter alphabets must be recovered (full keyspace ~ (25!)^2). Standard approach: determine the period first (same periodic statistics as Bifid). Then simulated annealing / hill-climbing over BOTH squares simultaneously, scoring with English quadgram log-probability; perturb by swapping two letters in one of the two squares per step, with many random restarts. ACA notes ~150-200 letters are needed for a reliable solve. The conjugate structure means a correct Square B with a wrong Square A still yields garbage, so joint optimization (or solving the fractionation period and treating it as a digraphic substitution to bootstrap) is required.",
+    "notes": "ACA cipher type (Cipher Exchange). 'Conjugated Matrix' = the second/conjugate square. Recommended length 150-200 letters. Only the final back-substitution step differs from Bifid; if Square B == Square A it degenerates to plain Bifid."
+  },
+  {
+    "name": "Trifid",
+    "category": "fractionation",
+    "algorithm": "KEY/CUBE: Use a 27-character mixed alphabet (26 letters + one extra symbol, conventionally '#' in ACA or '+' elsewhere; NO I/J merge — all 26 letters are present). The alphabet is laid into a 3x3x3 cube giving every character a trigram (layer, row, col) each in 1..3. ACA's array is written as a single 27-char keyed alphabet under three header rows of coordinates: the first header row = the layer/'block' digit (nine 1s, nine 2s, nine 3s), the second = the middle digit (1 1 1 2 2 2 3 3 3 repeated), the third = the last digit (1 2 3 repeated). So character at position k (0-based) has trigram = (k//9 +1, (k//3)%3 +1, k%3 +1).\n\nENCRYPT: (1) Choose period P (5-15). (2) Build the keyed 27-char alphabet (keyword deduped + remaining letters + the extra symbol). (3) Split message into blocks of length P. (4) Within each block, under each letter write its three coordinates VERTICALLY (digit1 top, digit2 middle, digit3 bottom). (5) Read the block's digits HORIZONTALLY in order: all P first-digits, then all P second-digits, then all P third-digits = 3P digits. (6) Take consecutive TRIPLES of digits; each triple (a,b,c) is a (layer,row,col) and is converted back through the SAME alphabet to one ciphertext letter. Concatenate across blocks. Ciphertext length = plaintext length. (ACA processes each period-length group fully before the next.)\n\nDECRYPT: For each P-block, convert each ciphertext letter to its trigram and lay the 3P digits out horizontally; split into three consecutive thirds (first P = layer digits, second P = row digits, third P = col digits); re-assemble plaintext letter i from (third1[i], third2[i], third3[i]) and look it up.",
+    "key_format": "A keyword/keyphrase building one 27-character mixed alphabet (26 letters + one extra symbol such as # or +), plus an integer period P. Fill is row-by-row through the cube layers in the ACA convention.",
+    "reciprocal": false,
+    "test_vectors": [
+      {
+        "plaintext": "trifidsarefractionatedciphers",
+        "key": "27-char alphabet EXTRAODINYBCFGHJKLMPQSUVWZ# (keyword EXTRAORDINARY deduped -> EXTRAODINY, then remaining letters B C F G H J K L M P Q S U V W Z, then #); period = 10",
+        "ciphertext": "EYMXV UCRYY YYEAY VYOVV XITDP ATHE",
+        "source": "American Cryptogram Association, official cipher description sheet 'TRIFID', cryptogram.org/downloads/aca.info/ciphers/Trifid.pdf (page 85). Alphabet row: E X T R A O D I N Y B C F G H J K L M P Q S U V W Z #. Blocks of 10: 'trifidsare','fractionat','edciphers'."
+      },
+      {
+        "plaintext": "FELIX",
+        "key": "keyword CRYPTOGRAPHY, extra symbol '+', 27-char alphabet -> Layer1: C R Y / P T O / G A H ; Layer2: B D E / F I J / K L M ; Layer3: N Q S / U V W / X Z + ; period = 5 (whole message)",
+        "ciphertext": "ILASF",
+        "source": "Boxentriq, 'Trifid Cipher' worked example (boxentriq.com/ciphers/trifid-cipher). Trigrams F=221 E=213 L=232 I=222 X=331; layer-string 22223, row-string 21323, col-string 13221; triples 222 232 132 313 221 -> I L A S F."
+      }
+    ],
+    "crack_approach": "Keyless: (1) Determine the period P (test candidates; correct P maximizes plaintext-statistic fitness after un-fractionation). (2) Hill-climb / simulated-anneal the 27-character cube alphabet to maximize English quadgram (or trigram) log-probability, swapping two symbols per step, with multiple random restarts. Trifid spreads each plaintext letter across 3 cipher letters so it needs more text than Bifid (~120-150 letters per ACA) and the right period is essential before alphabet recovery converges.",
+    "notes": "Invented by Felix Delastelle, described 1902; an extension of Bifid into 3 dimensions. 27th symbol (# or +) is part of the alphabet — it can appear in ciphertext and is usually stripped/ignored or treated as a separator if it surfaces in plaintext. No I/J merge."
+  },
+  {
+    "name": "ADFGX",
+    "category": "fractionation",
+    "algorithm": "Two-stage: fractionating substitution via a 5x5 Polybius square, then a single columnar transposition.\n\nSTAGE 1 (substitution): Build a 5x5 keyed square of 25 letters (I and J share a cell; replace J with I in plaintext). Label the 5 rows and 5 columns with the letters A,D,F,G,X (chosen for dissimilar Morse code). Replace each plaintext letter by the two-letter pair (rowLabel, colLabel) of its cell. This doubles the length: each plaintext letter -> 2 ciphertext-alphabet letters (each from {A,D,F,G,X}).\n\nSTAGE 2 (transposition): Take the fractionated letter stream and write it row-by-row into a grid whose number of columns = length of a transposition keyword. Number the columns by the alphabetical rank of the keyword letters. Read the grid out column-by-column in keyword-alphabetical order, concatenating columns, to give the final ciphertext. (Columns may be unequal length if the stream doesn't fill the last row.)\n\nDECRYPT: Reverse the transposition: compute column lengths from total length and keyword (the first r columns get the extra cell where r = total mod keylen, assigned by original column position), refill columns in keyword-alphabetical order, read off row-by-row to recover the A/D/F/G/X stream; then take consecutive PAIRS and look each (row,col) up in the square to recover plaintext (I/J ambiguous).",
+    "key_format": "TWO keys: (1) a keyword to build the 5x5 keyed alphabet (25 letters, I/J merged), and (2) a transposition keyword (any length) for the columnar transposition.",
+    "reciprocal": false,
+    "test_vectors": [
+      {
+        "plaintext": "attackatonce  (Attack at once)",
+        "key": "5x5 square (rows): b t a l p / d h o z k / q f v s n / g i(j) c u x / m r e w y with row/col labels A D F G X. Transposition keyword CARGO.",
+        "ciphertext": "FAXDF ADDDG DGFFF AFAX AFAFX",
+        "source": "Wikipedia, 'ADFGX cipher' / 'ADFGVX cipher' worked example (en.wikipedia.org/wiki/ADFGVX_cipher). Fractionation: a=AF t=AD t=AD a=AF c=GF k=DX a=AF t=AD o=DF n=FX c=GF e=XF. Stream AFADADAFGFDXAFADDFFXGFXF written under CARGO, columns read in order A,C,G,O,R."
+      }
+    ],
+    "crack_approach": "Keyless: the two stages are attacked in order. (1) Recover the transposition: the ciphertext length is twice the plaintext length, so the column lengths are constrained; for each candidate transposition-key length, try permutations (or hill-climb the column order) and undo the transposition to reassemble a fractionated A/D/F/G/X stream. (2) Test candidate un-transpositions by the periodic/bigram statistics of the resulting digraph stream — a correct transposition makes the recovered pairs behave like a monoalphabetic-on-digraphs distribution (good 5x5 fractionation IoC). (3) With the transposition solved, the remaining map (25 cell-pairs -> letters) is a simple substitution on 25 symbols solvable by hill-climbing the square with quadgram fitness. Classic historical break (Painvin) exploited multiple messages of the same length sharing the key; modern keyless attacks combine simulated annealing over transposition order + square.",
+    "notes": "Introduced March 1918 by Col. Fritz Nebel (German Army). 5x5 -> only 25 letters, no digits, I/J merged. Predecessor to ADFGVX."
+  },
+  {
+    "name": "ADFGVX",
+    "category": "fractionation",
+    "algorithm": "Same two-stage construction as ADFGX but with a 6x6 grid. STAGE 1: Build a 6x6 keyed square holding all 36 characters = 26 letters + 10 digits (0-9); NO I/J merge. Label the 6 rows and 6 columns A,D,F,G,V,X. Replace each plaintext character by its (rowLabel,colLabel) pair, doubling the length into a stream over {A,D,F,G,V,X}.\n\nSTAGE 2 (columnar transposition): Write the fractionated stream row-by-row under a transposition keyword (one column per keyword letter). Rank the columns by the alphabetical order of the keyword letters. Read out column-by-column in that ranked order and concatenate -> final ciphertext. Last row may be partial (unequal columns).\n\nDECRYPT: Undo transposition (derive per-column lengths from total length mod keyword length, the leftmost (by original position) columns receiving the extra cells; refill columns in keyword-alphabetical order; read row-by-row to recover the A/D/F/G/V/X stream), then take consecutive PAIRS and look up (row,col) in the 6x6 square. Because digits are encodable, no I/J ambiguity.",
+    "key_format": "TWO keys: (1) keyword to fill the 6x6 keyed alphabet over 36 chars (A-Z + 0-9), and (2) a transposition keyword for the columnar transposition.",
+    "reciprocal": false,
+    "test_vectors": [
+      {
+        "plaintext": "attackat1200am",
+        "key": "6x6 square filled from keyword/phrase 'nachtbommenwerper' then remaining letters/digits, rows: N A 1 C 3 H / 8 T B 2 O M / E 5 W R P D / 4 F 6 G 7 I / 9 J 0 K L Q / S U V X Y Z ; labels A D F G V X. Transposition key PRIVACY.",
+        "ciphertext": "DGDD DAGD DGAF ADDF DADV DVFA ADVX",
+        "source": "Wikipedia, 'ADFGVX cipher' worked example (en.wikipedia.org/wiki/ADFGVX_cipher). Fractionation: a=AD t=DD t=DD a=AD c=AG k=VG a=AD t=DD 1=AF 2=DG 0=VF 0=VF a=AD m=DX. Pairs written row-wise under PRIVACY (7 cols), columns read in alphabetical key order A C I P R V Y and concatenated."
+      }
+    ],
+    "crack_approach": "Keyless: identical strategy to ADFGX. (1) The ciphertext length = 2 x plaintext length, constraining transposition column lengths. For each candidate transposition-key length, hill-climb / brute-force / simulated-anneal the column permutation; score each undo by how well the resulting paired digraph stream matches a clean 6x6 fractionation distribution (digraph IoC, balanced A/D/F/G/V/X frequencies). (2) Once transposition is recovered, the cell-pair -> character map is a 36-symbol simple substitution solved by hill-climbing the 6x6 square with quadgram fitness. Historically broken by Georges Painvin (June 1918) using messages of identical length sharing a key; modern automated solvers nest simulated annealing of the transposition inside square recovery.",
+    "notes": "In June 1918 Nebel added the letter V (and digits), expanding ADFGX's 5x5 (25 letters, I/J merged) to a 6x6 (36 chars, full alphabet + 0-9). Heavier than ADFGX because of the larger square and inclusion of digits."
+  },
+  {
+    "name": "Digrafid",
+    "category": "fractionation",
+    "algorithm": "A fractionated DIGRAPHIC cipher built on a single tableau made of TWO mixed 27-character alphabets (A-Z + '#') arranged around a 3x3x3 numeric bridge.\n\nTABLEAU: A HORIZONTAL alphabet is written as a 3x9 grid (3 rows x 9 columns), so each of its 27 letters has a column index 1..9 and a row index 1..3. A VERTICAL alphabet is written as a 9x3 grid (9 rows x 3 columns), so each of its 27 letters has a row index 1..9 and a column index 1..3. Between them sits a 3x3x3 block of numbers (the ACA shows it as digits 1..9 laid in three 3x3 panels) indexed by [horizontalRow (1..3)] x [verticalCol (1..3)] -> a value 1..9; equivalently the bridge supplies the middle digit.\n\nENCRYPT (per ACA): (1) Choose a period = number of DIGRAPHS per group. (2) Split plaintext into digraphs (pad final with # if odd); group the digraphs into period-length groups. (3) For each digraph (L1,L2): the FIRST number = column of L1 in the horizontal (3x9) alphabet (1..9); the THIRD number = row of L2 in the vertical (9x3) alphabet (1..9); the MIDDLE number = the bridge value at [row of L1 in horizontal alphabet] x [column of L2 in vertical alphabet] (1..9). Write this 3-digit number VERTICALLY under the digraph (top=first, mid=middle, bottom=third). (4) FRACTIONATE exactly as in Trifid within each group: read the top row of digits across the whole group, then the middle row, then the bottom row, forming a new sequence; regroup into new vertical 3-digit numbers (one per digraph). (5) For each new triple (x,y,z): the output digraph's FIRST letter = the horizontal-alphabet letter in column x and the row given by the bridge cell that holds y; the SECOND letter = the vertical-alphabet letter in row z and the column given by that same bridge cell. (Operationally: y locates a (row,col) in the 3x3 bridge; first cipher letter = horizontal[that row, column x]; second cipher letter = vertical[row z, that col].) Output two letters per input digraph; ciphertext length = plaintext length.\n\nDECRYPT: The procedure is its own inverse in structure ('decryption is identical to encryption') run with the squares: convert each ciphertext digraph back to its 3-digit number via the tableau, fractionate-back (read the regrouped triples out, un-permute the rows of the group), then map each original 3-digit number back to a plaintext digraph via column-of-L1 / bridge / row-of-L2.",
+    "key_format": "TWO keywords producing two mixed 27-character alphabets (A-Z + '#'): one for the horizontal 3x9 alphabet and one for the vertical 9x3 alphabet, PLUS a period (digraphs per group). The 3x3x3 numeric bridge is fixed (digits 1..9).",
+    "reciprocal": false,
+    "test_vectors": [
+      {
+        "plaintext": "This is the forest pri  (thisistheforestpri)",
+        "key": "Both alphabets keyed with KEYWORD... ACA tableau — Horizontal 3x9 rows: K E Y W O R D A B / C F G H I J L M N / P Q S T U V X Z # . Vertical 9x3 (rows 1..9): v d p / e f q / r g s / t h u / i j w / c k x / a m y / l n z / b o # . Period (fractionation) = 3 digraphs per group.",
+        "ciphertext": "HJMXWS WJADWG FCSPYI",
+        "source": "American Cryptogram Association, official cipher description sheet 'DIGRAFID', cryptogram.org/downloads/aca.info/ciphers/Digrafid.pdf (page 43). Digraphs Th Is Is / Th Ef Or / Es Tp Ri give vertical 3-digit numbers 4/8/4 5/6/3 5/6/3 | 4/8/4 2/2/2 5/1/3 | 2/3/3 4/9/1 6/1/5; fractionated -> CT HJ MX WS / WJ AD WG / FC SP YI."
+      },
+      {
+        "plaintext": "This is the forest pri  (thisistheforestpri)",
+        "key": "Same tableau as above; period (fractionation) = 4 digraphs per group.",
+        "ciphertext": "HJTKVHYU FFWDSQYP RI",
+        "source": "American Cryptogram Association, 'DIGRAFID' description sheet, cryptogram.org/downloads/aca.info/ciphers/Digrafid.pdf (page 43), the second worked example ('fractionation 4 = 4 pairs of letters/8 letters') on the same tableau."
+      }
+    ],
+    "crack_approach": "Keyless: hardest of the set — two 27-letter alphabets plus a period. (1) Determine the period (digraphs/group) by testing candidates and scoring un-fractionated plaintext statistics. (2) Hill-climb / simulated-anneal over BOTH 27-character alphabets jointly to maximize English quadgram log-probability, perturbing by swapping two letters in one alphabet per step with many random restarts; the fixed numeric bridge removes one degree of freedom. ACA recommends 120-220 letters. Because it is digraphic with a Trifid-style fractionation, both the period and the two squares must be co-recovered, so solvers typically nest period search outside a joint annealing of the two alphabets.",
+    "notes": "ACA cipher type, first published Sep-Oct 1960 in The Cryptogram (by member KNUTE). Combines Bifid/Trifid ideas: digraphs -> 3-digit numbers via two mixed 27-letter alphabets + a 3x3x3 bridge, then Trifid-style fractionation. '#' is the 27th symbol used for padding/odd lengths. Some non-ACA implementations (e.g. dCode) describe an equivalent variant with a 3x9 top, 9x3 bottom and a 3x3 bridge giving the same triple (col-of-L1, bridge, row-of-L2)."
+  },
+  {
+    "name": "Fractionated Morse",
+    "category": "fractionation",
+    "algorithm": "ENCRYPT: (1) Build a keyed alphabet from the keyword: write the keyword dropping repeated letters, then append the remaining unused A-Z letters in order, giving a 26-letter mixed alphabet (e.g. CROWDED -> CROWDEABFGHIJKLMNPQSTUVXYZ). (2) Convert plaintext to International Morse, joining the morse of letters within a word with a single 'x', and joining words with 'xx' (i.e. 'x' = inter-letter gap, 'xx' = inter-word gap). Do NOT put 'x' at the very start or end. (3) The 26 keyed-alphabet letters are the labels of the 26 columns of a fixed 3-row table whose body, read down each column, enumerates all 27 trigrams over the symbol set {dot('.'), dash('-'), 'x'} in the order produced by: top row pattern .........---------xxxxxxxx (9 dots, 9 dashes, 8 x — actually all 27 columns but only first 26 are labelled), middle row ...---xxx...---xxx...---xx, bottom row .-x.-x.-x.-x.-x.-x.-x.-x.- . Concretely the unkeyed mapping is letter1='...' (3 morse symbols), and each successive letter is the next trigram in base-3 (.,-,x) counting; the 27th trigram 'xxx' is left UNUSED/unlabelled. With a keyed alphabet the SAME 26 trigrams (in the same fixed column order) are instead labelled by the keyed letters. (4) Take the morse stream and pad the END with extra 'x' (some references pad with dots) until its length is a multiple of 3. (5) Split into consecutive groups of 3 symbols; replace each trigram with its column label (keyed letter). That string is the ciphertext. DECRYPT: For each ciphertext letter, look up its column's trigram (3 morse symbols) via the keyed alphabet, concatenate all trigrams into one morse stream, then parse the stream splitting on 'x' (letter boundary) and 'xx' (word boundary), trim trailing padding, and translate each morse group back to a letter. Encrypt != decrypt.",
+    "key_format": "A single keyword/keyphrase used to build the 26-letter mixed alphabet (the column labels). No period. The unkeyed/identity version uses the straight alphabet A-Z.",
+    "reciprocal": false,
+    "test_vectors": [
+      {
+        "plaintext": "HELLO WORLD",
+        "key": "(none / straight alphabet A=...)",
+        "ciphertext": "AGTCDHOTQODTCJ",
+        "source": "dCode 'Fractionated Morse Cipher' (https://www.dcode.fr/fractionated-morse) and asecuritysite.com/encryption/frac. Verified by recomputation: morse = ....x.x.-..x.-..x---xx.--x---x.-.x.-..x-.. (42 symbols, divisible by 3) -> AGTCDHOTQODTCJ. Unkeyed table column order: A=... B=..- C=..x D=.-. E=.-- F=.-x G=.x. H=.x- I=.xx J=-.. K=-.- L=-.x M=--. N=--- O=--x P=-x. Q=-x- R=-xx S=x.. T=x.- U=x.x V=x-. W=x-- X=x-x Y=xx. Z=xx- (xxx unused)."
+      },
+      {
+        "plaintext": "NOBODY GOES THERE (partial)",
+        "key": "CROWDED",
+        "ciphertext": "IKUOKUBDZI... (partial)",
+        "source": "CryptoCrack user guide, Fractionated Morse page (https://sites.google.com/site/cryptocrackprogram/user-guide/cipher-types/substitution/fractionated-morse). Keyed alphabet CROWDEABFGHIJKLMNPQSTUVXYZ."
+      }
+    ],
+    "crack_approach": "Keyless: hill-climbing or simulated annealing over the 26-letter keyed alphabet (the column labeling). Decrypt the ciphertext under a candidate alphabet, translate resulting morse to letters, and score the recovered plaintext with English quadgram/log-likelihood fitness; swap pairs of letters in the alphabet to improve the score. Also dictionary keyword search. The morse-to-text step naturally rejects illegal morse (e.g. xxx) constraining the search.",
+    "notes": "Invented by ACA member FIDDLE, first in The Cryptogram Apr-May 1960. Each ciphertext letter = 3 morse symbols, so 1 cipher letter carries fractional information about up to ~1.5 plaintext letters. Common bug: forgetting 'xx' (double-x) word separators or placing an 'x' at the message boundary."
+  },
+  {
+    "name": "Morbit",
+    "category": "fractionation",
+    "algorithm": "ENCRYPT: (1) Convert plaintext to International Morse with 'x' between letters in a word and 'xx' between words (no leading/trailing x). (2) Pad the END of the morse stream with one extra 'x' if its length is odd, so it is even. (3) There are exactly 9 ordered morse-symbol PAIRS over {'.','-','x'} in the canonical fixed order: pos1='..', pos2='.-', pos3='.x', pos4='-.', pos5='--', pos6='-x', pos7='x.', pos8='x-', pos9='xx' (dCode writes the separator as '/'). (4) Build the digit labeling from a 9-letter keyword: number the keyword's letters 1..9 in strict alphabetical order (ties broken left-to-right), and that number sequence becomes the digit assigned to each of the 9 pair-positions in order. E.g. MORSECODE -> sorted C,D,E,E,M,O,O,R,S -> labels per original position M=5 O=6 R=8 S=9 E=3 C=1 O=7 D=2 E=4, i.e. the 9 columns get digits 5 6 8 9 3 1 7 2 4. (5) Split the padded morse into consecutive PAIRS; replace each pair with the digit assigned to that pair-position. Group output digits in 5s by convention. DECRYPT: invert the digit->pair table, replace each ciphertext digit with its 2-symbol morse pair, concatenate, then parse on 'x'/'xx' and translate morse to text (trim padding). Encrypt != decrypt.",
+    "key_format": "A 9-letter keyword (the 9 morse-pair columns are numbered 1-9 by the keyword's alphabetical order). Equivalent direct key: a permutation of digits 1-9.",
+    "reciprocal": false,
+    "test_vectors": [
+      {
+        "plaintext": "MORE BITS",
+        "key": "MORSECODE (columns -> digits 5 6 8 9 3 1 7 2 4)",
+        "ciphertext": "32379749578158",
+        "source": "dCode 'Morbit Cipher' (https://www.dcode.fr/morbit-cipher). Verified by recomputation: morse = --x---x.-.x.xx-...x..x-x... (27 symbols) padded to 28 with trailing x -> 14 pairs -> 32379749578158. Canonical pair order .. .- .x -. -- -x x. x- xx mapped to digits 5 6 8 9 3 1 7 2 4."
+      },
+      {
+        "plaintext": "COME QUICKLY WATSON",
+        "key": "(ACA worked example, keyword not published)",
+        "ciphertext": "55929 37268 13196 75361 96342 43317 235",
+        "source": "The Black Chamber, 'Morbit' (https://theblackchamber552383191.wordpress.com/2020/11/16/morbit/). Morse and structure confirmed by recomputation; exact keyword not stated in source."
+      }
+    ],
+    "crack_approach": "Keyless: brute force is small — only 9! = 362,880 digit-permutations, but really the cipher uses 9 pairs over an alphabet of distinct digits, so try all assignments of the 9 pair-positions to the digits appearing in the ciphertext (often fewer than 9 distinct digits). For each candidate digit->pair map, expand to morse, attempt to parse on x/xx and translate; reject maps that yield illegal morse (e.g. 'xxx', or morse groups with no letter), and score legal results with English n-gram fitness. Hill-climb the digit permutation otherwise.",
+    "notes": "'MORse BIT'. Two-tier (pairs) version of Fractionated Morse. Invented for ACA. ACA convention forbids three x's in a row in the plaintext morse, which prunes candidates. dCode uses '/' for the x separator; identical semantics."
+  },
+  {
+    "name": "Pollux",
+    "category": "fractionation",
+    "algorithm": "ENCRYPT: (1) Convert plaintext to International Morse with single 'x' between letters and 'xx' between words (no leading/trailing x). (2) Define a key: a mapping from each digit 0-9 to ONE of the three morse symbols {dot '.', dash '-', separator 'x'}, such that every symbol is represented by at least one digit (ACA guidance: at least 4 digits = dot). This is many-to-one (10 digits, 3 symbols). (3) Encrypt by walking the morse stream left-to-right; for each symbol, output ANY one digit whose key-value equals that symbol (encipherer's free choice — output is non-unique / homophonic). Group ciphertext digits in 5s. DECRYPT (deterministic): replace each ciphertext digit by its single morse symbol via the key, concatenate to a morse stream, parse on 'x'/'xx', translate morse to letters. Encrypt != decrypt (and encrypt is non-deterministic, decrypt is deterministic).",
+    "key_format": "A 10-element key assigning each digit 0-9 to a morse symbol (e.g. key string over {.,-,x} of length 10 indexed by digit 1,2,...,9,0). Equivalently: which digits mean dot, which mean dash, which mean x (>=1 each, typically >=4 dots).",
+    "reciprocal": false,
+    "test_vectors": [
+      {
+        "plaintext": "THIS IS A TEST",
+        "key": "digits 1234567890 -> . . - x - - . x x -  (i.e. 1=. 2=. 3=- 4=x 5=- 6=- 7=. 8=x 9=x 0=-)",
+        "ciphertext": "58172 14779 21284 71411 79913 94081 47218 0",
+        "source": "The Black Chamber, 'Pollux' (https://theblackchamber552383191.wordpress.com/2020/11/19/pollux/). Morse verified by recomputation = -x....x..x...xx..x...xx.-xx-x.x...x- (matches source exactly). The digit string is one valid homophonic realization (digits for dot in {1,2,7}, dash in {3,5,6,0}, x in {4,8,9}); decryption recovers THIS IS A TEST."
+      }
+    ],
+    "crack_approach": "Keyless: this is a homophonic substitution of morse symbols, so partition the 10 digits into 3 classes (dot/dash/x). Use the structural constraints: 'x' digits never appear 3-in-a-row (no xxx) and morse letters have length 1-4 between x's; hill-climb or constraint-search the assignment of each digit to {.,-,x}, decode to morse, parse, and score with English n-gram fitness. The relative frequencies (dot most common, then dash, then x) seed initial guesses.",
+    "notes": "Named after Pollux of the Gemini twins; sibling of Morbit/Fractionated Morse. Ambiguity at decode time is resolved because legal morse parsing is unique; the encipherer must avoid creating ambiguous boundaries (ACA bans xxx)."
+  },
+  {
+    "name": "Bacon (biliteral / Baconian)",
+    "category": "substitution",
+    "algorithm": "ENCRYPT: Replace each plaintext letter by a fixed 5-symbol group over a binary alphabet {a,b} (or {A,B}, 0/1). The classic 24-letter table (I=J share a code, U=V share a code) in straight binary order: A=aaaaa B=aaaab C=aaaba D=aaabb E=aabaa F=aabab G=aabba H=aabbb I/J=abaaa K=abaab L=ababa M=ababb N=abbaa O=abbab P=abbba Q=abbbb R=baaaa S=baaab T=baaba U/V=baabb W=babaa X=babab Y=babba Z=babbb. (A modern 26-letter variant simply gives I, J, U, V their own distinct 5-bit codes, using 26 of the 32 patterns.) Concatenate the 5-symbol groups (no separators). STEGANOGRAPHIC layer (Bacon's original): hide the a/b pattern in a longer innocuous cover text by rendering each cover letter in one of two typefaces/forms — form-A letters = 'a', form-B letters = 'b' — reading 5 cover letters per hidden letter. DECRYPT: split the a/b stream into groups of 5, look each group up in the table to recover a letter (mapping I/J->I, U/V->U if using the 24-letter table). Encrypt and decrypt are NOT the same operation, but the code is an involutive lookup.",
+    "key_format": "Essentially keyless/fixed (the standard table). 'Key' choices are only: which 24- vs 26-letter table, and (for the stego version) which two typefaces/letterforms denote a vs b. Some variants permute which alphabet letter maps to which 5-bit pattern.",
+    "reciprocal": false,
+    "test_vectors": [
+      {
+        "plaintext": "DCODE",
+        "key": "standard 24-letter table",
+        "ciphertext": "AAABB AAABA ABBAB AAABB AABAA",
+        "source": "dCode 'Baconian Cipher' (https://www.dcode.fr/bacon-cipher): 'DCODE is encrypted AAABB,AAABA,ABBAB,AAABB,AABAA' (D=AAABB, C=AAABA, O=ABBAB, D=AAABB, E=AABAA)."
+      }
+    ],
+    "crack_approach": "Keyless: the binary table is standard, so 'cracking' is (a) for the stego form, detecting the two letterforms/typefaces (italic vs roman, two fonts, case, etc.) to extract the a/b bitstream, then chunking by 5 and table lookup; (b) if a permuted table is used, it is a 24- or 26-symbol monoalphabetic substitution on the 5-bit groups — solve by frequency analysis / n-gram hill-climbing over the group->letter assignment. The main difficulty is recognizing that biliteral encoding is present and finding the binary distinction in the carrier.",
+    "notes": "Devised by Francis Bacon (1605). Period-of-5 structure: ciphertext (the a/b stream) length is always a multiple of 5. The 24-letter table merges I=J and U=V per Latin convention; an implementer must pick one table and apply J->I and V->U on encrypt (or give them distinct codes in the 26-letter variant)."
+  },
+  {
+    "name": "Tridigital",
+    "category": "substitution",
+    "algorithm": "ENCRYPT: (1) Take a 10-letter keyword and number its letters 1,2,...,9,0 in strict alphabetical order (ties left-to-right); these 10 digits become the column labels of a 10-column grid (e.g. NOVELCRAFT -> labels N=6 O=7 V=0 E=3 L=5 C=2 R=8 A=1 F=4 T=9). (2) Build a 26-letter keyed alphabet from a SECOND keyword (drop repeats, then append unused A-Z), and write it left-to-right, top-to-bottom into the grid filling only the FIRST 9 columns over 3 rows (3x9 = 27 cells, the 26 letters fill all but one cell). The 10th column is left blank and is reserved as the WORD-SPACER column. (3) Each plaintext letter is enciphered by the single digit labeling the column it sits in (so a letter is always the same digit; but a digit can stand for the up-to-3 letters stacked in its column). A space between words is enciphered as the digit labeling the 10th (blank) column. J is treated as I (J->I) when building/looking up the alphabet. Output is a digit string, conventionally grouped in 5s. DECRYPT: write the keyed alphabet back into the grid under the numbered columns, then for each ciphertext digit read the column of (up to 3) candidate letters; the spacer digit marks a word break; resolve the ambiguity (each digit = 1 of up to 3 letters, except the spacer) by reading sensible words. Encrypt != decrypt.",
+    "key_format": "Two keywords: (a) a 10-letter keyword to produce the 10 column-number labels, and (b) a keyword to build the 26-letter keyed (mixed) alphabet that fills the 3x9 grid. (Some setups use a single keyword for both.)",
+    "reciprocal": false,
+    "test_vectors": [
+      {
+        "plaintext": "THE IDES OF MARCH",
+        "key": "column keyword NOVELCRAFT (labels 6 7 0 3 5 2 8 1 4 9); keyed alphabet from DRAGONFLY -> DRAGONFLYBCEHIJKMPQSTUVWXZ; word-spacer digit = 9",
+        "ciphertext": "0 3 0 9 5 6 0 7 9 5 8 9 1 0 7 7 3",
+        "source": "The Black Chamber, 'Tridigital cipher' (https://theblackchamber552383191.wordpress.com/2020/11/18/tridigital-cipher/) and ACA Tridigital spec. Verified by recomputation: grid rows DRAGONFLY / BCEHIJKMP / QSTUVWXZ under columns labelled 6 7 0 3 5 2 8 1 4 9; spaces -> 9; yields 0 3 0 9 5 6 0 7 9 5 8 9 1 0 7 7 3."
+      }
+    ],
+    "crack_approach": "Keyless: it is a monoalphabetic many-to-one map of 26 letters onto 10 digits with a dedicated word-separator digit. First do a frequency count of the digits — the word-spacer digit appears at word boundaries (frequent, and it never falls inside a word). Then use word-length patterns and crib/pattern matching (consistent letter->digit) to recover letters; finally reconstruct the keyword/keyed alphabet from the column structure. Because each digit hides up to 3 letters, contextual n-gram solving is needed.",
+    "notes": "ACA cipher type #84. The 10th column carries only the word spacer; an implementer must keep that column empty when filling the keyed alphabet (3x9 = 27 cells for 26 letters). J->I. Output digit count = number of plaintext letters + number of word gaps."
+  },
+  {
+    "name": "Tri-Square (Three-Square)",
+    "category": "polygraphic",
+    "algorithm": "ENCRYPT: (1) Build THREE 5x5 keyed squares (J merged into I, 25 letters each) from three keywords: each square = keyword with repeats removed then remaining letters A-Z (J omitted) in order, filled row by row. Conventional layout: square 1 = bottom-left, square 2 = top-right, square 3 = bottom-right ('middle' square). (2) Split plaintext into digraphs (pad an odd final letter, commonly with X). For a digraph (P1, P2): locate P1 in square 1 and P2 in square 2. Output a TRIGRAPH (3 letters): C1 = any letter in square 1 that is in the SAME COLUMN as P1; C2 = the letter in square 3 at the intersection of the ROW of P1 (from square 1) and the COLUMN of P2 (from square 2); C3 = any letter in square 2 that is in the SAME ROW as P2. (Equivalently per dCode: C1 from P1's column in grid1, C2 = grid3 intersection of grid1-row(P1) and grid2-column(P2), C3 from P2's row in grid2.) Because C1 and C3 are free choices within a line/column, encryption is NON-UNIQUE. DECRYPT: For trigraph (C1,C2,C3): C1 gives the COLUMN (its column in square 1) = column of P1; C3 gives the ROW (its row in square 2) = row of P2; C2 in square 3 gives a (row,col): its ROW = row of P1 (in square 1) and its COLUMN = column of P2 (in square 2). Then P1 = square1[row-from-C2, col-from-C1], P2 = square2[row-from-C3, col-from-C2]. Encrypt != decrypt; decryption is deterministic despite encryption's freedom.",
+    "key_format": "Three keywords, one per 5x5 keyed square (J->I, 25-cell squares). (A 6x6 variant uses A-Z plus digits 0-9, pairing A1 B2 ... J0, with no J->I merge.)",
+    "reciprocal": false,
+    "test_vectors": [
+      {
+        "plaintext": "MESSAGE",
+        "key": "square1=ONE, square2=TWO, square3=THREE",
+        "ciphertext": "TKDGNVSAFRAV (one valid realization; C1 and C3 letters are free choices)",
+        "source": "dCode 'Three-Squares Cipher' (https://www.dcode.fr/three-squares-cipher). For digraph ME: M at (row3,col5) of grid1, E at (row2,col3) of grid2, grid3 intersection = K at (row3,col3); trigram = TKD (T = a letter from grid1 column5; K = grid3 intersection; D = a letter from grid2 row2)."
+      },
+      {
+        "plaintext": "THE ONLY WAY TO GET RID OF A TEMPTATION IS TO YIELD TO IT (digraphs th eo nl yw ay to ge tr id of at em pt at io ni st oy ie ld to it)",
+        "key": "square1=OSCAR, square2=WILDE, square3=QUOTE",
+        "ciphertext": "LWU QPZ HKR TIW AES AWT RME YVL ILD NUS FTO QPL PVZ ATO PZE VKI WTZ OEN ILG TLY LWG PSE",
+        "source": "CryptoCrack user guide, Tri-Square page (https://sites.google.com/site/cryptocrackprogram/user-guide/cipher-types/substitution/tri-square). Keyed alphabets e.g. OSCAR->OSCARBDEFGHIKLMNPQTUVWXYZ."
+      }
+    ],
+    "crack_approach": "Keyless: ciphertext length is a multiple of 3 (period-3 trigraphs per plaintext digraph). The decode relation only depends on C2 (the square-3 intersection) plus the column-of-C1 and row-of-C3, so reconstruct by hill-climbing all THREE 5x5 squares simultaneously (or with simulated annealing), decrypting candidate trigraphs to digraphs and scoring recovered plaintext with English bigram/quadgram fitness. The freedom in C1/C3 means only C2 and the column/row indices carry information, so attacks key on consistent square-3 placements; keyword/dictionary search on the three squares accelerates it.",
+    "notes": "Invented by ACA member THALES, first in The Cryptogram Sep-Oct 1959. Relative of Two-Square/Four-Square but emits a trigraph per digraph (data expansion 3:2). J->I in the 5x5 form. Encryption is homophonic in positions 1 and 3, so a given plaintext has many valid ciphertexts; decryption is still unique."
+  },
+  {
+    "name": "Complete Columnar Transposition",
+    "category": "transposition",
+    "algorithm": "ENCRYPT: (1) Choose a keyword of length L (L = number of columns). (2) Number the columns by ranking the keyword letters alphabetically; equal letters are ranked left-to-right by their position in the keyword (so each column gets a unique rank 1..L). Example: keyword TOMATO -> rank columns as A=1, M=2, first O=3, second O=4, first T=5, second T=6 -> column ranks [5,3,2,1,6,4]. (3) Write the plaintext into a rectangle of width L, row by row, left to right, top to bottom. (4) Because it is COMPLETE, pad the last row with null letters (conventionally X) so every column has the same height (total length is a multiple of L). (5) Read the columns vertically (top to bottom) in ascending rank order (column ranked 1 first, then 2, ...). Concatenate; output in 5-letter groups. DECRYPT: Compute rows = ceil(len/L) (with complete columnar all columns are full so rows = len/L). Determine column ranks from the keyword exactly as in encryption. Slice the ciphertext into L equal blocks of height `rows`, assign the blocks to columns in ascending rank order, rebuild the grid, then read row by row to recover the plaintext (strip trailing X padding). I/J: none (no square involved). Period = L.",
+    "key_format": "A single keyword (or numeric column key). Column order = alphabetical rank of keyword letters, ties broken left-to-right by position. Equivalent numeric key e.g. CHILD=13452, TOMATO=532164.",
+    "reciprocal": false,
+    "test_vectors": [
+      {
+        "plaintext": "THE TOMATO IS A PLANT IN THE NIGHTSHADE FAMILY",
+        "key": "TOMATO (column order = A,M,O,O,T,T i.e. ranks [5,3,2,1,6,4]); pad last row with X",
+        "ciphertext": "TINES AXEOA HTFXH TLTHE YMAII AIXTA PNGDL OSTNH MX",
+        "source": "Crypto Corner (interactive-maths.com), Columnar Transposition Cipher page. Reproduced exactly by my own computation (grid 7x6 padded with X)."
+      }
+    ],
+    "crack_approach": "Keyless: try every plausible period L (column count). For each L, the ciphertext columns are intact contiguous blocks of height len/L. Use a column-pairing / multiple-anagramming approach: score adjacency of column pairs by English bigram log-likelihood, then reconstruct the column permutation by a path/TSP-style search or hill-climb over permutations, maximizing tetragram fitness of the recovered rows. CryptoCrack uses brute-force/hill-climb over key permutations scored by n-gram fitness.",
+    "notes": "Complete vs incomplete is decided solely by whether len is a multiple of L (complete) or not (incomplete). ACA convention: minimum length and that the rectangle is filled completely (with nulls if needed)."
+  },
+  {
+    "name": "Incomplete Columnar Transposition",
+    "category": "transposition",
+    "algorithm": "ENCRYPT: Identical to complete columnar EXCEPT no padding: the message length need NOT be a multiple of L, so the last row is partially filled and some columns are one letter SHORTER than others. (1) Keyword length L = columns; rank columns alphabetically (ties left-to-right). (2) Write plaintext row by row into width-L grid; the final row is short, leaving the rightmost (last-written) cells empty. With rows = ceil(len/L) and r = len mod L, the first r columns (by physical/left-to-right position, NOT rank) have height `rows`; the remaining L-r columns have height rows-1. (3) Read columns vertically in ascending rank order; concatenate; group by 5. DECRYPT: This is the subtle part. Compute L (period), rows = ceil(len/L), r = len mod L. Columns in physical positions 0..r-1 are LONG (height = rows); positions r..L-1 are SHORT (height = rows-1). Going through columns in ASCENDING RANK order, peel off from the ciphertext a block whose length is the height of that column's physical position. Place each block into its column. Then read the grid row by row, skipping empty trailing cells, to recover plaintext. Period = L. No square, no I/J handling.",
+    "key_format": "Single keyword (or numeric column key); column order = alphabetical rank, ties left-to-right. Same key format as complete columnar.",
+    "reciprocal": false,
+    "test_vectors": [
+      {
+        "plaintext": "EXPERIENCE IS SOMETHING YOU DON'T GET UNTIL JUST AFTER YOU NEED IT",
+        "key": "REALITY (numeric column order 5214367)",
+        "ciphertext": "PETUT URDXC EOEJE ERSIO NTOTE IHDUS YIENM YGLTE ISNNT AUEOG TIFN",
+        "source": "CryptoCrack User Guide, Incomplete Columnar page (sites.google.com/site/cryptocrackprogram). Grid: 8 columns (REALITY=7? note CryptoCrack worked example uses key REALITY with width 7, 8 rows, final row incomplete)."
+      }
+    ],
+    "crack_approach": "Keyless: same as complete columnar but the column lengths are unequal, which actually HELPS — only column lengths consistent with an incomplete grid for a given L are tried. For each candidate period L, derive the long/short column lengths, cut the ciphertext accordingly, then multiple-anagram / hill-climb the column order using bigram and tetragram fitness. CryptoCrack only tests keyword lengths that produce an incomplete grid.",
+    "notes": "Key distinction from complete columnar: NO null padding; column heights differ by at most 1. Decryption MUST account for which physical columns are long vs short (first `len mod L` physical columns are long)."
+  },
+  {
+    "name": "Myszkowski Transposition",
+    "category": "transposition",
+    "algorithm": "A columnar transposition whose keyword DELIBERATELY contains repeated letters. ENCRYPT: (1) Number the columns by alphabetical rank of the keyword letters, but REPEATED letters all receive the SAME number (unlike ordinary columnar where ties are broken). E.g. keyword TOMATO -> A=1, M=2, O=3 (both O's =3), T=4 (both T's =4) -> column numbers [4,3,2,1,4,3]. (2) Write plaintext row by row under the keyword (ACA/Crypto Corner version pads with X to complete the rectangle; some texts leave it incomplete). (3) Read off by ascending column number: for a number used by a SINGLE column, read that column straight down (vertically). For a number shared by SEVERAL columns, read those columns together ROW BY ROW: for each grid row, output the letters in those columns left-to-right, then move to the next row. DECRYPT: Reconstruct column numbering from the keyword. Knowing rows = len/L (complete) you know each column/group size. Process numbers in ascending order: for a singleton number, the next `rows` ciphertext letters fill that column top-to-bottom; for a shared number spanning k columns, the next k*rows letters fill those k columns row-by-row (fill row 0 across the k columns, then row 1, ...). Then read the grid row by row. Period = L.",
+    "key_format": "A keyword chosen to have at least one repeated letter; column numbers = alphabetical rank with identical letters sharing a number. Encrypt==decrypt is false.",
+    "reciprocal": false,
+    "test_vectors": [
+      {
+        "plaintext": "THE TOMATO IS A PLANT IN THE NIGHTSHADE FAMILY",
+        "key": "TOMATO (column numbers A=1,M=2,O=3,O=3,T=4,T=4 -> [4,3,2,1,4,3]); pad last row with X",
+        "ciphertext": "TINES AXEOA HTFXH MTALI TIHAE IYXTO ASPTN NGHDM LX",
+        "source": "Crypto Corner (interactive-maths.com) Myszkowski Transposition page; also Wikipedia 'Transposition cipher' (Myszkowski section). Reproduced exactly by my own computation."
+      }
+    ],
+    "crack_approach": "Keyless: try each period L. The keyword's repeated-letter pattern is unknown, so hill-climb over column-number assignments (partitions where some columns share a number) OR dictionary-search keywords with repeats. Score recovered plaintext with tetragram log-probability. Because shared-number columns are read row-by-row, the multiple-anagram structure differs from plain columnar; CryptoCrack offers brute force over key length plus dictionary keyword search across periods.",
+    "notes": "Distinguished from columnar by repeated keyword letters read jointly row-by-row. Wikipedia's worked decrypt vector: ciphertext 'ARESA SXOOS ITIHA EIYEL XPENG DLLTT AEHNT HFMAW XX' with key POTATO decrypts to 'potatoes are in the nightshade family as well'."
+  },
+  {
+    "name": "Amsco",
+    "category": "transposition",
+    "algorithm": "Incomplete columnar transposition that fills the grid with ALTERNATING 1-letter and 2-letter chunks (created by A.M. Scott). ENCRYPT: (1) Pick a numeric/keyword column key of length L. (2) Choose a starting cut: either 1 (cells take 1,2,1,2,... letters) or 2 (2,1,2,1,...). (3) Fill the grid LEFT-TO-RIGHT, ROW BY ROW, taking the next chunk of the plaintext for each cell; the chunk size alternates 1,2,1,2,... CONTINUOUSLY across the whole fill (the alternation does not reset each row — it continues from where the previous row left off, which is why successive rows offset). Start a new row after L cells. The last cells may take whatever letters remain (possibly a short final chunk); some columns end up with more letters than others. (4) Read the columns top-to-bottom in ascending key rank order; concatenate. DECRYPT: Reconstruct the grid SHAPE first: simulate the same alternating 1/2 fill over `len` characters with width L and the chosen start, recording how many letters each cell holds and thus each column's total letter count. Then, taking ciphertext in ascending key-rank order, peel off exactly that many letters per column and place them into the grid cells (respecting each cell's 1- or 2-letter size). Finally read the grid row by row, cell by cell, to recover plaintext. Period = L; cutting sequence (start 1 or 2) is part of the key. No square/I-J.",
+    "key_format": "A column permutation key (numeric, e.g. 31452, or a keyword reduced to numeric order) PLUS a cutting-sequence flag = whether the first cell holds 1 or 2 letters.",
+    "reciprocal": false,
+    "test_vectors": [
+      {
+        "plaintext": "DCODEAMSCO",
+        "key": "KEY (numeric column order 2,1,3); cutting sequence starts with 1 (1,2,1,2,...)",
+        "ciphertext": "COMDEAODSC",
+        "source": "dCode.fr AMSCO Cipher page. Grid rows: [D|CO|D] / [EA|M|SC] / [O| | ]; read cols in order 2,1,3 -> CO+M, D+EA+O, D+SC. Reproduced exactly by my own computation."
+      }
+    ],
+    "crack_approach": "Keyless: brute force the period L (typically 3..12) and the 2 cutting-sequence starts. For each (L, start), the cell-size pattern fixes the column lengths; cut the ciphertext into columns and hill-climb / multiple-anagram the column permutation, scoring with English n-gram (bigram/tetragram) fitness. CryptoCrack brute-forces period range and both cutting sequences.",
+    "notes": "The continuous (non-resetting) alternation is the crux: row 1 might be 1,2,1; row 2 then begins with 2,1,2; etc. dCode/CryptoCrack worked example confirms this. Another published vector (Thonky/CryptoCrack 'A person who smiles...' key 31452) yields EOSNE OSBAA OANWE FAVPR HPEAP HSICE ROASG RSMTH FITBS CTOIL EADYL YA."
+  },
+  {
+    "name": "Route Transposition",
+    "category": "transposition",
+    "algorithm": "ENCRYPT: (1) Write the plaintext into a complete rectangle of a given width W (row by row, left to right, top to bottom — the standard write-in route; W must divide len, or pad). (2) Read the letters out following a different geometric ROUTE (the read-out route) — e.g. spiral inward clockwise from a named corner, by diagonals, boustrophedon (alternating-direction rows), up/down columns, etc. CryptoCrack enumerates 48 write-in routes and 48 read-out routes (12 direction families: horizontal, vertical, two diagonals, clockwise-from-corner, clockwise-from-middle, boustrophedon horizontal, boustrophedon vertical, boustrophedon diagonal, anticlockwise-from-corner, anticlockwise-from-middle, each able to start at any of the 4 corners or the middle). (3) Output the read-off sequence, grouped by 5. DECRYPT: Knowing W, the write-in route, and the read-out route: place the ciphertext letters back into the rectangle following the READ-OUT route (in order), then read the grid out following the WRITE-IN route to recover plaintext. Both routes and W are the key. No keyed alphabet, no I/J.",
+    "key_format": "Grid width W (3..20) + a named write-in route + a named read-out route (each = direction family + starting corner/middle). Often the write-in is plain rows and only the read-out route varies.",
+    "reciprocal": false,
+    "test_vectors": [
+      {
+        "plaintext": "WE ARE DISCOVERED",
+        "key": "width 4; write-in by rows; read-out = spiral inward anticlockwise (counter-clockwise) starting from the top-right corner",
+        "ciphertext": "RAEWE CREDX ESIDO V",
+        "source": "CryptoCrack User Guide, Route Transposition page (sites.google.com/site/cryptocrackprogram): decrypting 'RAEWE CREDX ESIDO V' with route 'spiral inwards counter-clockwise from the top right', width 4, gives 'We are discovered'."
+      }
+    ],
+    "crack_approach": "Keyless: for each candidate width W (divisors / near-divisors of len), try the catalog of standard routes (spirals, diagonals, serpentine, columns) for the read-out, invert to candidate plaintext, and score with tetragram fitness; keep the best. Because the route set is small and finite, this is effectively brute force over (W, route) pairs.",
+    "notes": "A second CryptoCrack example: plaintext 'It is far better to be alone...' width 6, spiral inwards counter-clockwise from bottom-right yields 'XTEAN ITROB ATSYV NTEDX OEHOM EHSOE SPBUI'. Routes are geometric, not letter-keyed."
+  },
+  {
+    "name": "Redefence",
+    "category": "transposition",
+    "algorithm": "A Rail Fence whose rails are READ in a key-determined order, optionally with an OFFSET. ENCRYPT: (1) Choose number of rails R (ACA: 3..7) and an offset O (0..2R-3). (2) Write the plaintext in the usual zigzag: imagine starting O 'steps' into the up-down cycle (the offset shifts where on the zigzag the first letter is placed), going down to the bottom rail, back up to the top, etc. Letters land on successive rails following the triangular-wave pattern of period 2R-2. (3) Instead of reading the rails top rail first, read them in the order given by a NUMERIC KEY (a permutation of 1..R). Concatenate the rows in that key order; group by 5. DECRYPT: Knowing R, O, and the key: first compute, for each plaintext position, which rail it occupies (the zigzag pattern with the given offset) to get each rail's length. Cut the ciphertext into rail-strings using the rail lengths but in the KEY order, assign each strip to its rail, then walk the zigzag pattern (with offset O) reading one letter from the appropriate rail at each step to recover plaintext. Key = (rail order permutation, R, offset). If R=natural order and O=0 it degenerates to plain Rail Fence. No alphabet/I-J.",
+    "key_format": "A numeric permutation of the rails (e.g. 3,1,2) giving read order, PLUS number of rails R and an offset O in 0..2R-3.",
+    "reciprocal": false,
+    "test_vectors": [
+      {
+        "plaintext": "THIS IS A TEST",
+        "key": "3 rails, offset 0, rail read-order = rail2, rail3, rail1 (numeric key 3,1,2 meaning rail1 read 3rd, rail2 1st, rail3 2nd)",
+        "ciphertext": "HSSTS IATTI E",
+        "source": "The Black Chamber (theblackchamber552383191.wordpress.com) Railfence/Columnar/Redefence post: zigzag rows are rail1='Tie', rail2='hssts', rail3='iat'; with key (3,1,2) the rows are output rail2+rail3+rail1 = 'hsststiatTie' -> 'HSSTS IATTI E'. (Plain railfence of same text = 'TIEHS STSIA T'.)"
+      }
+    ],
+    "crack_approach": "Keyless: enumerate rails R in 3..7 and offsets O in 0..2R-3; for each, the rail lengths are fixed, so try the R! (small) permutations of rail order (or hill-climb), reassemble, and score plaintext with tetragram fitness. CryptoCrack/ACA solve by trial of all rail-count/offset/order combinations.",
+    "notes": "Redefence = Rail Fence + permuted rails (+ offset). The offset (0..2R-3) controls the starting phase of the zigzag. Plain Rail Fence is the special case key=identity, offset=0."
+  },
+  {
+    "name": "Cadenus",
+    "category": "transposition",
+    "algorithm": "A keyed columnar transposition combined with per-column cyclic row rotation; message length MUST be a multiple of 25. ENCRYPT: (1) Let C = len/25 = number of columns; the keyword must have length C. (2) Write the plaintext into a grid of 25 rows and C columns, row by row. (3) Attach a fixed 25-letter alphabet down the rows. The standard ACA row alphabet runs A,B,C,...,U,(V=W),X,Y,Z down rows 0..24 (V and W share a row; W is treated as V). (4) For each column, take its keyword letter K and CYCLICALLY ROTATE that column UPWARD so the row whose attached alphabet letter equals K moves to the top. Equivalently, using the reversed shift-alphabet S='AZYXVUTSRQPONMLKJIHGFEDCB' (25 letters, W omitted), the upward rotation amount for the column = index of K in S (A->0, Z->1, Y->2, ..., B->24; T->6, etc.). (5) PERMUTE the columns into ascending alphabetical order of their keyword letters (ties left-to-right). (6) Read the resulting grid off BY ROWS (left to right, top to bottom); group by 5. DECRYPT: Reverse: undo the column permutation (restore original keyword-letter column order), then rotate each column DOWNWARD by the same amount (index of its keyword letter in S), then read by rows. Encrypt and decrypt differ (rotations and permutation invert). The 25-letter row alphabet and W->V mapping are essential.",
+    "key_format": "A single keyword of length exactly len/25. Keyword letters give BOTH the column order (alphabetical) AND each column's upward rotation amount (via the reversed shift alphabet AZYX...CB). W in plaintext is treated as V.",
+    "reciprocal": false,
+    "test_vectors": [
+      {
+        "plaintext": "HIDETHEGOLDINTOTHETREESTUMP (padded to a multiple of 25 by the implementation)",
+        "key": "LEPRACHAUN",
+        "ciphertext": "JXKZQHJXIZEHHXGZLHIXTZTHEDRTEETOMDKNQOJHKTQEJSKUQP",
+        "source": "dnafinder/crypto reference implementation cadenus.m (github.com/dnafinder/crypto), header example. Shift alphabet 'AZYXVUTSRQPONMLKJIHGFEDCB' and per-column circshift by find(shiftAlpha==keyletter)-1 quoted verbatim from the code."
+      }
+    ],
+    "crack_approach": "Keyless: try each column count C (= len/25). For each C, the column lengths are fixed (25). Hill-climb jointly over the column permutation and the 25 possible rotations per column (or note that the SAME keyword letter sets both rotation and order, so hill-climb over keyword strings of length C from a dictionary), scoring recovered rows with tetragram fitness. CryptoCrack treats it as a constrained double transposition and brute-forces/dictionary-searches the keyword.",
+    "notes": "CRITICAL details: length must be a multiple of 25; 25 rows; W folded into V (25-letter alphabet); rotation amount derived from the REVERSED alphabet AZYX...CB (so A=0, B=24, ... Z=1). Column permutation is ordinary alphabetical-by-keyword. Read OUT by rows."
+  },
+  {
+    "name": "Swagman",
+    "category": "transposition",
+    "algorithm": "A transposition using an n x n KEY SQUARE that is a Latin square of the digits 1..n (no digit repeats in any row or column). ENCRYPT: (1) Choose square size n (ACA: 4..8, sometimes stated 3..7). Build an n x n key square filled with 1..n so no digit repeats in a row or column (a Latin square; derived from a numeric key). (2) Write the plaintext horizontally into a rectangle with exactly n rows, in blocks n columns wide (i.e. consecutive n x n blocks side by side), adding null letters to complete the final block/row. (3) Encipher each n x n plaintext block independently: for each COLUMN of the block, reorder its n letters VERTICALLY according to the corresponding column of the key square — the plaintext letter sitting in the row that holds key-digit 1 goes to ciphertext row 1, the letter in the row holding digit 2 goes to row 2, etc. (4) Read the ciphertext off VERTICALLY (column by column, block by block) in 5-letter groups. DECRYPT: With the same key square, invert the per-column permutation in each block: the ciphertext letter in row r goes back to the plaintext row that holds key-digit (r+1) in that key-square column. Then read the rectangle by rows to recover plaintext (strip nulls). Encrypt!=decrypt. No alphabet/I-J; period = n (square size).",
+    "key_format": "A square size n (4..8) plus a numeric key defining an n x n Latin square (each row/column a permutation of 1..n). Given as the rows of the square, e.g. 5x5: 32145 / 15324 / 24531 / 53412 / 41253.",
+    "reciprocal": false,
+    "test_vectors": [
+      {
+        "plaintext": "DONT BE AFRAID TO TAKE A BIG LEAP IF ONE IS INDICATED. YOU CANNOT CROSS A RIVER OR A CHASM IN TWO SMALL JUMPS.",
+        "key": "5x5 key square rows: 32145 / 15324 / 24531 / 53412 / 41253",
+        "ciphertext": "ENDSC MORDA NIBOI SICTN ASTGB LTEWA OAREE FSAID VPYRM OEAIA FUILR LDOCO TJNRA AENOU NCMIT SOAPH SKATI.",
+        "source": "American Cryptogram Association, 'The ACA and You', Swagman.pdf (cryptogram.org/downloads/aca.info/ciphers/Swagman.pdf). Extracted verbatim via pdftotext: plaintext written in 5 rows x blocks, ciphertext placed column-by-column per the key square."
+      }
+    ],
+    "crack_approach": "Keyless: fix n (4..8). The cipher permutes letters only WITHIN columns of each n x n block, all blocks using the SAME key square, so column j across all blocks is a constrained shuffle. Hill-climb over candidate Latin squares (or over the per-column permutations subject to the Latin-square constraint), scoring recovered plaintext with n-gram fitness; equivalently brute force small n. CryptoCrack solves Swagman by brute force / hill-climbing the key square.",
+    "notes": "Key insight: same key square applied to every n x n block; the per-column vertical permutation is the transposition. Letters never leave their column, only change rows within the block, so the i-th letter of every block-column stays in that column — a strong structural constraint for cracking."
+  },
+  {
+    "name": "Nihilist Transposition",
+    "category": "transposition",
+    "algorithm": "A double (columns-then-rows) keyed transposition on a square grid, SAME key applied to both columns and rows. Grid is n x n (ACA max 10x10); len must be a perfect square (pad if needed). ENCRYPT (Elcy / writing-in-key version): (1) Write plaintext into Square 1 by rows, n x n, with the key digits labeling BOTH the columns (across the top) and the rows (down the side). (2) Square 2: permute the COLUMNS so the column key-digits are in ascending order (move column labeled 1 to position 1, etc.). (3) Square 3: permute the ROWS of Square 2 so the row key-digits are in ascending order. (4) Take the ciphertext off Square 3 either BY COLUMNS or BY ROWS (a stated convention). DECRYPT: reverse — write the ciphertext into Square 3 by the same take-off route, restore original row order (inverse row permutation), restore original column order (inverse column permutation), then read Square 1 by rows. LEDGE / taking-out-key variant: the key is placed so that it labels the SORTED order (columns are permuted INTO numerical order, then rows into numerical order); writing-in and taking-out keys are inverses of each other, and for self-inverse keys (e.g. 2134) both methods give identical results. Encrypt!=decrypt in general. No alphabet/I-J.",
+    "key_format": "One numeric key (a permutation of 1..n) used for BOTH the column permutation and the row permutation. CryptoCrack note: for 'The ACA & You' compatibility, nihilist keys are the inverse of columnar keys.",
+    "reciprocal": false,
+    "test_vectors": [
+      {
+        "plaintext": "SQUARENEEDEDHERE (the filler phrase 'square needed here', n=4)",
+        "key": "2134 (applied to both columns and rows; Elcy writing-in method)",
+        "ciphertext": "EQDER SEHNU EREAD E (taken off by columns)  — or  ERNEQ SUADE EDEHR E (taken off by rows)",
+        "source": "American Cryptogram Association, 'The ACA and You', NihilistTransposition.pdf (cryptogram.org/downloads/aca.info/ciphers/NihilistTransposition.pdf), citing Elcy ch. IV p.18. Reproduced exactly by my own computation (cols-then-rows permutation of the 4x4 square)."
+      }
+    ],
+    "crack_approach": "Keyless: the period is n = sqrt(len), so n is essentially known. Hill-climb / simulated-annealing over the single n-permutation key (n<=10 -> at most 10! candidates, easily searched with annealing), applying it to both columns and rows, scoring the recovered grid's rows with tetragram log-probability. CryptoCrack solves Nihilist Transposition by brute force / key hill-climb.",
+    "notes": "Same key on rows AND columns is the defining feature. Two ACA-documented conventions exist (Elcy writing-in key vs LEDGE taking-out key); they are inverses, and coincide for self-inverse keys like 2134. Take-off can be by rows or by columns — specify which. Grid must be square (n x n)."
+  },
+  {
+    "name": "Nihilist Substitution",
+    "category": "polyalphabetic",
+    "algorithm": "SETUP: Build a 5x5 Polybius square from a keyword. Take the keyword, drop repeated letters, then append the remaining unused letters of the alphabet in order. J is merged into I (25-letter alphabet). Fill the square left-to-right, top-to-bottom. Label rows and columns 1..5. Each letter's value is a two-digit number = (row digit)(column digit), ROW FIRST. ENCRYPT: (1) Convert each plaintext letter to its two-digit square coordinate. (2) Take a SECOND keyword (the additive key), convert each of its letters to two-digit coordinates using the SAME square; this key sequence repeats cyclically to the length of the plaintext. (3) For each position, ciphertext number = plaintext number + key number (ordinary decimal addition, NOT digit-wise mod). Results range roughly 22..110; ACA convention leaves them as printed (often 2- or 3-digit). Some implementations reduce any sum >100 by subtracting 100 (keep last two digits). DECRYPT: subtract the repeating key number from each ciphertext number (add 100 first if the ciphertext digit pattern requires it), giving a two-digit number whose tens digit is the row and units digit is the column; look up the letter. Encrypt != decrypt. Note: because each plaintext/key coordinate digit is 1..5, a ciphertext two-digit group can be uniquely split (units in 2..10, tens in 2..10) which is how the adversary segments.",
+    "key_format": "Two keywords: one builds the 5x5 square (mixed alphabet), one is the repeating numeric additive key (also enciphered via the same square). Period = length of the additive keyword.",
+    "reciprocal": false,
+    "test_vectors": [
+      {
+        "plaintext": "DYNAMITE WINTER PALACE",
+        "key": "Square keyword ZEBRAS; additive keyword RUSSIAN",
+        "ciphertext": "37 106 62 36 67 47 86 26 104 53 62 77 27 55 57 66 55 36 54 27",
+        "source": "Wikipedia, 'Nihilist cipher' (worked example, square keyword ZEBRAS, key RUSSIAN). PT digits 23 55 41 15 35 32 45 12 53 32 41 45 12 14 43 15 34 15 22 12; KEY digits 14 51 21 21 32 15 41 14 51 21 21 32 15 41 14 51 21 21 32 15"
+      },
+      {
+        "plaintext": "KREMLIN",
+        "key": "Standard A-B-C...square (no keyword), additive keyword VODKA",
+        "ciphertext": "83 78 29 64 43 76 69",
+        "source": "dCode.fr 'Nihilist cipher' worked example. PT 31 43 15 33 32 24 34; KEY V=52 O=35 D=14 K=31 A=11 (repeating)"
+      }
+    ],
+    "crack_approach": "Recover the additive key length (period) via Kasiski/IoC on the column digits or by noting that all valid plaintext+key digit-sums constrain each coordinate digit to 2..10. Subtract candidate key values; the resulting coordinate digits must all lie in 1..5 — this rejects wrong key digits. Once the period is found, solve each column as a Caesar-like additive on a Polybius coordinate, then hill-climb / frequency-analyze the recovered square as a simple substitution. The square keyword and additive keyword are both attacked by dictionary search."
+  },
+  {
+    "name": "Checkerboard",
+    "category": "substitution",
+    "algorithm": "SETUP: Build a 5x5 keysquare from a keyword (drop duplicates, append unused letters A-Z in order, J merged into I, 25 letters), filled row-wise. Choose TWO 5-letter keywords with no repeated letters: one labels the ROWS (down the left side), one labels the COLUMNS (across the top). ENCRYPT: locate each plaintext letter in the square; replace it by a DIGRAPH = (row-label letter)(column-label letter), ROW LETTER FIRST. Plaintext length L -> ciphertext length 2L. DECRYPT: take ciphertext in pairs; first letter selects the row (via the row keyword), second selects the column (via the column keyword); read the plaintext letter at that cell. Encrypt != decrypt. (Variant: if the cipher is set up with two row words and two column words, either of the paired key letters may stand for that coordinate, adding homophony; ACA standard uses one 5-letter word per axis.)",
+    "key_format": "Three keywords: keysquare keyword + a 5-letter ROW keyword + a 5-letter COLUMN keyword (each axis word has 5 distinct letters).",
+    "reciprocal": false,
+    "test_vectors": [
+      {
+        "plaintext": "I HAVENT LOST (letters IHAVENTLOST)",
+        "key": "Square keyword BACKUP; row keyword BRAIN; column keyword WAVES. Square:\\n    W A V E S\\nB | B A C K U\\nR | P D E F G\\nA | H I L M N\\nI | O Q R S T\\nN | V W X Y Z",
+        "ciphertext": "AA AW BA NW RV AS IS AV IW IE IS ...",
+        "source": "CryptoCrack user guide, Checkerboard page (worked example, square BACKUP, rows BRAIN, cols WAVES). I->cell(B,W)=AA, H->cell(B,A)=AW (note I/J merged), etc."
+      }
+    ],
+    "crack_approach": "Ciphertext uses only the 10 key-letters (5 row + 5 column) and always reads as digraphs alternating a row-letter then a column-letter, so identify the two 5-letter alphabets by position parity. Reduce to a 25-symbol monoalphabetic substitution on the digraphs and solve as an Aristocrat/Patristocrat with hill-climbing + n-gram (quadgram) fitness over the 5x5 keysquare; the two axis words fall out from the digraph alphabets."
+  },
+  {
+    "name": "Bazeries",
+    "category": "polygraphic",
+    "algorithm": "SETUP: (1) Choose a key NUMBER under 1,000,000. (2) LEFT square = the plain alphabet A-Z (J merged into I) written by COLUMNS into a 5x5 grid (i.e. read down columns: A F L Q V / B G M R W / ... per CryptoCrack's column-fill convention). (3) RIGHT square = a keyed alphabet derived from the key number SPELLED OUT in words: spell the number (e.g. 7352 -> SEVENTHOUSANDTHREEHUNDREDANDFIFTYTWO), drop repeated letters (-> SEVNTHOUADRFIYW), append unused alphabet letters in order (-> SEVNTHOUADRFIYWBCGJKLMPQXZ), J merged into I, filled by ROWS into the 5x5. ENCRYPT: (a) TRANSPOSE: divide plaintext into successive groups whose lengths cycle through the digits of the key number (e.g. 7352 -> groups of 7,3,5,2,7,3,5,2,...) and REVERSE the letters within each group. (b) SUBSTITUTE: for each (now transposed) letter, find it in the LEFT square and replace it with the letter at the SAME row/column position in the RIGHT square. DECRYPT: substitute right-square->left-square, then re-group by the same digit cycle and reverse each group again. Encrypt != decrypt.",
+    "key_format": "A single integer key (1..999,999). It both seeds the keyed right-hand alphabet (spelled out) AND defines the cyclic group lengths for the reversal transposition.",
+    "reciprocal": false,
+    "test_vectors": [
+      {
+        "plaintext": "A CLEAR CONSCIENCE IS USUALLY THE SIGN OF A BAD MEMORY",
+        "key": "7352",
+        "ciphertext": "RASMVRS YIG RIMCR CM VVSXYXY FKL IOCYM EG UMUBSHS LAG",
+        "source": "CryptoCrack user guide, Bazeries page. Intermediate (group-by-7,3,5,2 then reverse each group): 'craelca sno cneic ie llausus hty ngise fo memdaba yro'; keyed right alphabet SEVNTHOUADRFIYWBCGJKLMPQXZ."
+      }
+    ],
+    "crack_approach": "Brute-force the key number 1..999,999: for each candidate, build the keyed right alphabet (from the spelled-out number) and the digit-cycle transposition, decrypt, and score with quadgram fitness; the spelling constrains plausible alphabets so simulated-annealing / dictionary attacks on the implied keyword plus a search over short transposition cycles also work."
+  },
+  {
+    "name": "Gromark",
+    "category": "polyalphabetic",
+    "algorithm": "Name = GRonsfeld + Mixed Alphabet + Running Key. SETUP: (1) Choose a 5-digit numeric PRIMER. (2) Build a running numeric key by LAGGED-FIBONACCI / chain addition: the next digit = (digit_i + digit_{i+1}) mod 10, generating digits left-to-right and appending, until the key is as long as the plaintext. (Primer 12345 -> 1+2=3,2+3=5,3+4=7,4+5=9,5+3=8,... giving 1 2 3 4 5 3 5 7 9 ...). (3) Build a MIXED (cipher) alphabet by columnar transposition (K2-type/'sequence transposition'): write the keyed keyword alphabet into a block whose width = keyword length, number the columns by the alphabetical order of the keyword letters, then read the block off column-by-column in that numeric order to get a 26-letter mixed alphabet. ENCRYPT: align the STRAIGHT plaintext alphabet A-Z (positions 0..25) above the MIXED alphabet. For each plaintext letter take its index i in the straight alphabet, add the running-key digit d (0..9): ciphertext letter = MIXED alphabet at position (i + d) mod 26. DECRYPT: find ciphertext letter's index j in the MIXED alphabet, plaintext = straight alphabet at (j - d) mod 26. The primer is transmitted as the first group; the last running-key digit is often appended as a check digit. Encrypt != decrypt.",
+    "key_format": "A 5-digit primer + a keyword (for the mixed-alphabet columnar transposition). Period is effectively the full message (running key) until the chain sequence repeats (period of the 5-digit chain can be up to 10000).",
+    "reciprocal": false,
+    "test_vectors": [
+      {
+        "plaintext": "ONLYTWOTHINGSAREINFINITETHEUNIVERSEANDHUMANSTUPIDITYANDIMNOTSUREABOUTTHEFORMER",
+        "key": "Primer 32941; mixed-alphabet keyword GRONSFELD",
+        "ciphertext": "OHRERPHTMNUQDPUYQTGQHABASQXPTHPYSIXJUFVKNGNDRRIOMAEJGZKHCBNDBIWLDGVWDDVLXCSCZS",
+        "source": "CryptoCrack user guide, Gromark page (worked example). Running key = 3294151356648120293221254337976066366299281810999198800768073487072577972466 96 (chain-addition from primer 32941)."
+      }
+    ],
+    "crack_approach": "Recover the 5-digit primer (10^5 = 100000 candidates) or use the fact that the chain-addition sequence is fully determined by 5 consecutive digits: hill-climb / SA over the mixed alphabet for each primer guess, scoring with quadgrams. Because the running key digit only shifts within a fixed mixed alphabet, knowing/guessing some primer digits plus the column-transposition keyword (dictionary attack) recovers the rest; CryptoCrack solves even without the primer."
+  },
+  {
+    "name": "Periodic Gromark",
+    "category": "polyalphabetic",
+    "algorithm": "Like Gromark but the numeric key is PERIODIC. SETUP: (1) The PRIMER length = the keyword length P (this also sets the period). The primer digits are typically the alphabetical-order numbering of the keyword's distinct letters (e.g. KEYWORD -> distinct letters in order of appearance, numbered by alphabetical rank -> primer 3 2 7 6 4 5 1, period 7; TEACHER->TEACHR->631245, period 6). (2) Generate the running key by chain addition (next digit = sum of an adjacent pair mod 10) starting from the P-digit primer, extended to plaintext length, exactly as in Gromark. (3) Build the mixed alphabet from the keyword via columnar transposition as in Gromark. ENCRYPT/DECRYPT: identical substitution rule to Gromark (plaintext index + running-key digit, mod 26, between straight and mixed alphabets), but processed in blocks of size P so that within each period the same keyed-alphabet shift structure repeats; the period P (not 5) is the defining parameter. Encrypt != decrypt.",
+    "key_format": "A single keyword: its length is the period P, its alphabetical letter-order gives the P-digit primer, and the keyword also builds the mixed alphabet via columnar transposition.",
+    "reciprocal": false,
+    "test_vectors": [
+      {
+        "plaintext": "ADOCTORCANBURYHISMISTAKESBUTANARCHITECTCANONLYADVISEHISCLIENTSTOPLANTVINES",
+        "key": "Keyword WRIGHT (period 6); primer 643125",
+        "ciphertext": "DMRPZKUWZMXSNVAZMAZGGMKHMLVUIJFRPPYTHNOJMLHUMTWWSYMFXXYUOCBKEENFOPPRORILHX",
+        "source": "CryptoCrack user guide, Periodic Gromark page (worked example). Running key chain-addition from primer 643125 -> 6431250743757170..."
+      }
+    ],
+    "crack_approach": "Because the period P is short and embedded, the search space is much smaller than Gromark: try each period length P, recover the P-digit primer (chain-addition seed) and the mixed alphabet by hill-climbing with quadgram fitness; the periodicity lets you split ciphertext into P columns to estimate shifts before solving the keyed alphabet."
+  },
+  {
+    "name": "Ragbaby",
+    "category": "substitution",
+    "algorithm": "SETUP: Build a 24-letter keyed alphabet: take a keyword, drop repeated letters, append unused letters A-Z in order, then MERGE J into I and X into W, leaving 24 letters (e.g. FRANKLIN -> FRANKLIBCDEGHMOPQSTUVWYZ). NUMBERING: number the WORDS of the plaintext 1,2,3,...; within each word number the letters consecutively STARTING AT THE WORD NUMBER (word 1: letters 1,2,3,...; word 2: letters 2,3,4,...; etc.). If a position number exceeds 24 it wraps back to 1. ENCRYPT: for each plaintext letter, count FORWARD in the 24-letter keyed alphabet by that letter's position number (wrapping cyclically) to get the ciphertext letter. Word boundaries (spaces) are preserved; hyphenated/apostrophe words count as one word. DECRYPT: count BACKWARD by the same position number. Encrypt != decrypt.",
+    "key_format": "A single keyword building the 24-letter keyed alphabet (J->I, X->W). The shift schedule is fixed by word/letter position, so word divisions are part of the ciphertext.",
+    "reciprocal": false,
+    "test_vectors": [
+      {
+        "plaintext": "RAG BABY",
+        "key": "Keyed alphabet ALPHBETCDFGIKMNOQRSUVWYZ",
+        "ciphertext": "SPM THDH",
+        "source": "Wikipedia 'Ragbaby cipher' / dCode.fr canonical example. Word1 RAG shifts 1,2,3; Word2 BABY shifts 2,3,4,5: R+1=S, A+2=P, G+3=M, B+2=T, A+3=H, B+4=D, Y+5=H."
+      }
+    ],
+    "crack_approach": "No period; attack via the fixed shift schedule. Word lengths and positions are visible, so guess short words/cribs (the first word's letters shift 1,2,3,... revealing the keyed alphabet head). Hill-climb the 24-letter keyed alphabet with quadgram fitness, or use known-plaintext on common words; the deterministic per-position shift makes a crib on any word recover several alphabet entries directly."
+  },
+  {
+    "name": "Grandpre",
+    "category": "substitution",
+    "algorithm": "SETUP: Build an 8x8 grid (ACA size) where each of the 8 ROWS is an 8-letter word AND the 8 letters of the FIRST COLUMN also spell a word; collectively all 26 alphabet letters must appear (so several letters appear multiple times). Number rows 1..8 and columns 1..8 (some implementations/dCode use 1..0 for 10x10; for the 8x8 ACA form use 1..8). ENCRYPT (homophonic): replace each plaintext letter by a two-digit number (row)(column) of SOME cell containing that letter; when a letter occurs in several cells, choose any one (randomly), so a letter has multiple valid codes. Output = stream of two-digit numbers. DECRYPT: read numbers in pairs; (row,column) -> letter at that grid cell. Encrypt != decrypt (encryption is one-to-many; decryption is deterministic).",
+    "key_format": "Eight 8-letter words (the grid rows) such that the first column also spells a word and all 26 letters are present. No numeric key; the grid IS the key.",
+    "reciprocal": false,
+    "test_vectors": [
+      {
+        "plaintext": "HAPPINESS IS GOOD HEALTH AND A BAD MEMORY",
+        "key": "8x8 grid (rows ADJACENT, NAZARENE, AGGRIEVE, REQUITED, CHATEAUX, HALFBACK, IMPUNITY, CROSSBOW), rows/cols numbered 0-7 in this source",
+        "ciphertext": "61 24 73 73 35 75 26 84 85 45 84 33 87 87 48 52 16 11 63 18 52 62 17 48 66 86 22 12 72 38 72 87 25 78",
+        "source": "CryptoCrack user guide, Grandpre page (worked example; note this source numbers rows/cols 0-7, e.g. h=(6,1)=61, a=(0,1)=24). dCode.fr uses 1-based numbering for the 10x10 form."
+      }
+    ],
+    "crack_approach": "Because it is homophonic with at most 64 distinct codes (8x8) all of which are two-digit pairs, tally code frequencies: the 8x8 has ~64 cells for 26 letters, so high-frequency letters (E,T,A) map to several codes. Use the constraint that each ROW and each COLUMN is a real word (and column 1 is a word) to reconstruct the grid: cluster codes sharing a first digit (same row word) and a second digit (same column word), then solve the crossword-like grid with a dictionary of 8-letter words and n-gram scoring on candidate decryptions."
+  },
+  {
+    "name": "Phillips",
+    "category": "substitution",
+    "algorithm": "SETUP: Build a base 5x5 Polybius square (#1) from a keyword (drop duplicates, append unused letters, J merged into I, fill row-wise). Generate 8 squares: from square #1, form #2,#3,#4,#5 by moving ROW 1 down one position at a time (cyclically) while the other rows shift up; then form #6,#7,#8 by moving ROW 2 down one position at a time. (#1 and #5 coincide, #2 and #8 coincide in row-shift variant.) ENCRYPT: process plaintext in groups of 5 letters, using square #1 for letters 1-5, #2 for 6-10, ... #8 for 36-40, then cycle back to #1 (overall PERIOD 40). For each letter, locate it in the CURRENT square and substitute the letter DIAGONALLY DOWN-AND-RIGHT; if the letter is on the BOTTOM row, wrap to the TOP row (same column); if on the RIGHT column, wrap to the LEFT column (same row). DECRYPT: take the letter diagonally UP-AND-LEFT in the corresponding square, wrapping top->bottom and left->right. Encrypt != decrypt. (CryptoCrack offers Row, Column, or Row-Column variants for how the 8 squares are generated.)",
+    "key_format": "A single keyword (builds the base 5x5 square). Variant selector: Row / Column / Row-Column shift scheme. Fixed period 40.",
+    "reciprocal": false,
+    "test_vectors": [
+      {
+        "plaintext": "THETHINGST HATCO METOT...",
+        "key": "Keyword PATIENCE -> keyed alphabet PATIENCBDFGHKLMOQRSUVWXYZ (J->I); 8 row-shifted squares",
+        "ciphertext": "DRNDR MAQZL TRSKW OVYAY... (first groups; per-square diagonal-down-right substitution)",
+        "source": "CryptoCrack user guide, Phillips page (worked example, keyword PATIENCE)."
+      }
+    ],
+    "crack_approach": "Period is fixed at 40 (8 squares x 5). Treat as 8 related monoalphabets cyclically, but since all 8 squares derive from ONE 5x5 square, hill-climb / simulated-annealing directly on the single 25-letter keysquare: generate all 8 squares from a candidate, decrypt, and score with quadgram fitness. Slide the 40-period structure to align groups; the diagonal-shift relationship strongly constrains the square so SA converges quickly."
+  },
+  {
+    "name": "Condi",
+    "category": "polyalphabetic",
+    "algorithm": "Condi = 'CONsecutive DIgraphs'. SETUP: Build a keyed alphabet from a keyword (drop duplicates, append unused letters A-Z in order; 26 letters, J kept separate — full 26-letter alphabet). Number positions 1..26 (CryptoCrack) — note: implementations differ on 0- vs 1-based; be consistent. Choose an INITIAL OFFSET (1..25). ENCRYPT: maintain a current offset. For each plaintext letter P: (1) find P's position p in the keyed alphabet; (2) ciphertext letter = keyed-alphabet letter at position (p + offset) (wrap mod 26); (3) UPDATE: the new offset = p, the position of the PLAINTEXT letter just processed (per ACA/bionspot canonical rule). Repeat. DECRYPT: maintain the same offset; for each ciphertext letter C at position c in the keyed alphabet, plaintext position p = (c - offset) mod 26, recover P, then set offset = p for the next step. Encrypt != decrypt. (AMBIGUITY: CryptoCrack's prose says 'position of this ciphertext letter becomes the new offset', while bionspot/ACA worked examples use the PLAINTEXT letter's position; the plaintext-position rule is the standard ACA implementation.)",
+    "key_format": "A keyword (26-letter keyed alphabet) + an initial offset 1..25. No fixed period (chaining offset).",
+    "reciprocal": false,
+    "test_vectors": [
+      {
+        "plaintext": "ON THE",
+        "key": "Keyword CRYPTOGRAM -> keyed alphabet CRYPTOGAMBDEFHIJKLNQSUVWXZ; initial offset 10",
+        "ciphertext": "J X W N Z",
+        "source": "bionspot.google.site 'CONDI Ciphers' worked example. O(pos6)+10=16->J, then offset=6: N(pos19)+6=25->X, offset=19: T(pos5)+19=24->W, offset=5: H(pos14)+5=19->N, offset=14: E(pos11)+14=25->Z."
+      }
+    ],
+    "crack_approach": "Hill-climb / simulated-annealing over the 26-letter keyed alphabet AND the initial offset, scoring decryptions with quadgram fitness. Because the offset chain is deterministic from the keyed alphabet, a correct partial alphabet propagates; cribs on common openings fix the initial offset. Dictionary attack on the keyword reduces the alphabet search."
+  },
+  {
+    "name": "Homophonic",
+    "category": "substitution",
+    "algorithm": "ACA Homophonic. SETUP: From a 4-letter keyword (e.g. SLOW), build FOUR numbered 25-letter alphabets (J merged into I). Number 100 cells 01..00 (where 00=100) split into four ranges: alphabet 1 = 01..25, alphabet 2 = 26..50, alphabet 3 = 51..75, alphabet 4 = 76..00. Each alphabet is a straight A..Z (J->I) but offset so the LOWEST number of its range sits under the corresponding keyword letter: with SLOW, number 01 sits under S in alphabet 1, 26 under L in alphabet 2, 51 under O in alphabet 3, 76 under W in alphabet 4; numbering then increases A-order cyclically. Result: each of the 25 letters has exactly FOUR two-digit codes (one per alphabet), arranged in a 4x25 table. ENCRYPT: replace each plaintext letter by ONE of its four numbers, chosen at random (homophonic; flattens frequencies). DECRYPT: look each two-digit number up in the table -> its (unique) letter. Encrypt != decrypt (one-to-many encrypt, deterministic decrypt).",
+    "key_format": "A 4-letter keyword positioning the four numbered alphabets (4 homophone codes per letter, codes 01..00 = 1..100).",
+    "reciprocal": false,
+    "test_vectors": [
+      {
+        "plaintext": "HE WHO LAUGHS LAST THINKS SLOWEST (HEWHOLAUGHSLASTTHINKSSLOWEST)",
+        "key": "Keyword SLOW",
+        "ciphertext": "70 84 76 48 29 73 41 03 86 70 55 90 80 01 98 34 70 71 28 18 55 97 26 22 76 67 33 34",
+        "source": "CryptoCrack user guide, Homophonic page (worked example, keyword SLOW). Each letter substituted by one of its 4 numbers chosen at random."
+      }
+    ],
+    "crack_approach": "The four codes per letter cluster in four 25-number bands (01-25, 26-50, 51-75, 76-00); reduce by mapping each number n to (n-1) mod 25 — all four homophones of a letter collapse to the SAME residue, turning the cipher into a simple 25-symbol monoalphabetic substitution. Then solve that as an Aristocrat/Patristocrat (frequency + quadgram hill-climb); the keyword falls out from the alphabet offsets."
+  },
+  {
+    "name": "Aristocrat/Patristocrat (keyed alphabet K1-K4)",
+    "category": "substitution",
+    "algorithm": "Monoalphabetic substitution. ARISTOCRAT keeps word divisions; PATRISTOCRAT removes them (groups of 5). A keyed alphabet is 'keyword, drop duplicates, append unused letters A-Z in order'. Two alphabets are aligned (PLAINTEXT row over CIPHERTEXT row); the substitution maps plaintext letter -> the ciphertext letter beneath it. KEY TYPES: K1 = keyed PLAINTEXT alphabet, straight (A-Z) ciphertext alphabet. K2 = straight plaintext alphabet, keyed CIPHERTEXT alphabet. K3 = BOTH alphabets keyed with the SAME keyword (and usually offset so no letter maps to itself). K4 = both alphabets keyed with DIFFERENT keywords. ACA RULE: no plaintext letter may encipher to itself; if the natural alignment causes a fixed point, the keyed alphabet is shifted (rotated) until none occur. ENCRYPT: map via plaintext-row -> ciphertext-row. DECRYPT: invert the map. Encrypt != decrypt (it is a fixed permutation, self-inverse only if the permutation happens to be an involution, which is not generally true).",
+    "key_format": "K1/K2: one keyword (+ an alignment/offset). K3: one keyword used for both alphabets (+ offset). K4: two keywords (one per alphabet, + offset). Optionally a numeric offset/shift to enforce the no-self-map rule.",
+    "reciprocal": false,
+    "test_vectors": [
+      {
+        "plaintext": "TO BE INTOXICATED",
+        "key": "K1, keyword GCARLIN. Keyed PLAINTEXT alphabet gcarlinbdefhjkmopqstuvwxyz aligned over straight CIPHER alphabet shifted: a->Q,b->R,c->S,...,k->A,...",
+        "ciphertext": "JF XZ VWJFNVRSJZY",
+        "source": "CryptoCrack user guide, Aristocrat/Patristocrat page (K1 worked example, keyword GCARLIN). Mapping a->Q b->R c->S d->T e->U f->V g->W h->X i->Y j->Z k->A l->B m->C n->D o->E p->F q->G r->H s->I t->J u->K v->L w->M x->N y->O z->P."
+      }
+    ],
+    "crack_approach": "Classic monoalphabetic solve: frequency analysis (single letters, then bigrams/trigrams), pattern words (for Aristocrats with word breaks) against a dictionary, or automated hill-climbing / simulated-annealing on the 26-letter key with quadgram log-probability fitness (works for Patristocrats with no spaces). After recovering the substitution, detect the key type (K1-K4) by testing whether plaintext and/or ciphertext alphabets form keyed-keyword sequences, and recover the keyword(s)."
+  }
+]
