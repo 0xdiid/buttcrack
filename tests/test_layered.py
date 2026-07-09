@@ -45,8 +45,12 @@ def test_known_order_exact():
     """Given the columnar order, the substitution shifts recover exactly."""
     ct = _make(12, "NEEDLES")  # width 7, 240 letters -> ~20 letters/column
     r = crack_quagmire_over_columnar(
-        ct, get_scorer(), alphabet="KRYPTOS", period=12,
-        order=_read_order("NEEDLES"), shift_restarts=30,
+        ct,
+        get_scorer(),
+        alphabet="KRYPTOS",
+        period=12,
+        order=_read_order("NEEDLES"),
+        shift_restarts=30,
     )
     assert r["plaintext"] == PLAIN
     assert r["structure"]["columnar_order"] == _read_order("NEEDLES")
@@ -59,8 +63,13 @@ def test_order_search_recovers_width_and_text():
     plaintext comes out clean (columns long enough to be unambiguous)."""
     ct = _make(12, "NEEDLES")
     r = crack_quagmire_over_columnar(
-        ct, get_scorer(), alphabet="KRYPTOS", period=12,
-        widths=[6, 7, 8], order_restarts=25, shift_restarts=15,
+        ct,
+        get_scorer(),
+        alphabet="KRYPTOS",
+        period=12,
+        widths=[6, 7, 8],
+        order_restarts=25,
+        shift_restarts=15,
     )
     assert r["structure"]["columnar_width"] == 7
     assert r["structure"]["columnar_order"] == _read_order("NEEDLES")
@@ -149,8 +158,12 @@ def test_residual_suppressed_when_clean():
     """A clean solve returns no residual report (it would just be noise)."""
     ct = _make(12, "NEEDLES")
     r = crack_quagmire_over_columnar(
-        ct, get_scorer(), alphabet="KRYPTOS", period=12,
-        order=_read_order("NEEDLES"), shift_restarts=30,
+        ct,
+        get_scorer(),
+        alphabet="KRYPTOS",
+        period=12,
+        order=_read_order("NEEDLES"),
+        shift_restarts=30,
     )
     assert r["plaintext"] == PLAIN
     assert r["word_coverage"] >= 0.42

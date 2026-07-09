@@ -38,12 +38,13 @@ blind budget. Always run the matched synthetic control alongside any real attemp
 If the control does NOT clear 90%, report the recovery CEILING honestly: the cipher
 is then unfalsifiable-by-cracking at this length — do NOT claim the target refuted.
 """
+
 from __future__ import annotations
 
 import random
 import time
 
-from .scoring import resolve_scorer, index_of_coincidence
+from .scoring import index_of_coincidence, resolve_scorer
 
 KRYPTOS = "KRYPTOSABCDEFGHIJLMNQUVWXZ"
 STANDARD = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -205,8 +206,9 @@ def _dedup_keys(keys: list[str]) -> list[str]:
     return out
 
 
-def _local_climb(cur: list[str], tail: str, letters: str, period: int, decode,
-                 deadline: float) -> float:
+def _local_climb(
+    cur: list[str], tail: str, letters: str, period: int, decode, deadline: float
+) -> float:
     """Best-improvement greedy swap climb (mutates ``cur`` in place to a local opt).
 
     Scans all transpositions of the ``cur`` cells, applies the single best-gaining
@@ -239,8 +241,15 @@ def _local_climb(cur: list[str], tail: str, letters: str, period: int, decode,
     return cur_score
 
 
-def _greedy_climb(letters: str, alpha: str, period: int, decode, deadline: float,
-                  rng: random.Random, kick_swaps: int = 3) -> tuple[float, str]:
+def _greedy_climb(
+    letters: str,
+    alpha: str,
+    period: int,
+    decode,
+    deadline: float,
+    rng: random.Random,
+    kick_swaps: int = 3,
+) -> tuple[float, str]:
     """Iterated local search: greedy local climbs chained by random kicks.
 
     Climb to a local optimum (best-improvement greedy), then repeatedly KICK the
@@ -271,8 +280,16 @@ def _greedy_climb(letters: str, alpha: str, period: int, decode, deadline: float
     return best_score, best_alpha
 
 
-def _detect_period(letters: str, pool: str, symbol: str, decode, periods,
-                   rng: random.Random, probe_restarts: int, probe_seconds: float):
+def _detect_period(
+    letters: str,
+    pool: str,
+    symbol: str,
+    decode,
+    periods,
+    rng: random.Random,
+    probe_restarts: int,
+    probe_seconds: float,
+):
     """Rank candidate periods by the best seeded score.
 
     Robust under load: for every period each structured seed's RAW decode score is
@@ -284,7 +301,7 @@ def _detect_period(letters: str, pool: str, symbol: str, decode, periods,
     ranked: list[tuple[float, int, str]] = []
     seeds = _seed_keys(pool, symbol, rng, probe_restarts)
     for P in periods:
-        bs, ba = -1e18, None
+        bs, ba = -1e18, seeds[0]  # seeds is non-empty; default keeps ba a real key, never None
         for s0 in seeds:
             sc = _score(decode(letters, s0, P))  # raw, always evaluated
             if sc > bs:
@@ -301,8 +318,18 @@ def _detect_period(letters: str, pool: str, symbol: str, decode, periods,
     return ranked
 
 
-def _blind_solve(ct: str, pool: str, symbol: str, decode, *, periods, restarts,
-                 seconds_per_start, probe_seconds, seed):
+def _blind_solve(
+    ct: str,
+    pool: str,
+    symbol: str,
+    decode,
+    *,
+    periods,
+    restarts,
+    seconds_per_start,
+    probe_seconds,
+    seed,
+):
     """Shared blind pipeline: detect period, then deep greedy climb from seeds."""
     # Keep the cipher's FULL character set: Trifid ciphertext can legitimately
     # contain the 27th symbol cell, so it must NOT be filtered out (that would
@@ -312,16 +339,28 @@ def _blind_solve(ct: str, pool: str, symbol: str, decode, *, periods, restarts,
     rng = random.Random(seed)
     periods = list(periods)
 
-    ranked = _detect_period(letters, pool, symbol, decode, periods, rng,
-                            probe_restarts=min(restarts, 6), probe_seconds=probe_seconds)
+    ranked = _detect_period(
+        letters,
+        pool,
+        symbol,
+        decode,
+        periods,
+        rng,
+        probe_restarts=min(restarts, 6),
+        probe_seconds=probe_seconds,
+    )
     # Keep the strongest few periods for the deep pass.
     top_periods = [P for _, P, _ in ranked[: min(3, len(ranked))]]
 
     # Seed the incumbent with the detection winner so the deep pass can never
     # regress below what period detection already found (key-matched in-basin case).
     best_score, best_P, best_key = ranked[0]
-    best = {"score": best_score, "plaintext": decode(letters, best_key, best_P),
-            "key": best_key, "period": best_P}
+    best = {
+        "score": best_score,
+        "plaintext": decode(letters, best_key, best_P),
+        "key": best_key,
+        "period": best_P,
+    }
 
     seeds = _seed_keys(pool, symbol, rng, restarts)
     for P in top_periods:
@@ -339,31 +378,57 @@ def _blind_solve(ct: str, pool: str, symbol: str, decode, *, periods, restarts,
 # --------------------------------------------------------------------------- #
 # Public API
 # --------------------------------------------------------------------------- #
-def solve_trifid(ct: str, periods=range(3, 23), restarts: int = 40,
-                 seconds_per_start: float = 4.0, probe_seconds: float = 2.0,
-                 seed: int = 0) -> dict:
+def solve_trifid(
+    ct: str,
+    periods=range(3, 23),
+    restarts: int = 40,
+    seconds_per_start: float = 4.0,
+    probe_seconds: float = 2.0,
+    seed: int = 0,
+) -> dict:
     """Blind Trifid crack: detect period, greedy cube climb from many seeds.
 
     Returns ``dict(score, plaintext, key, period, ioc, period_ranking)`` where
     ``key`` is the recovered 27-cell alphabet (last cell is the symbol). ``score``
     is the hexagram log-prob total (higher is better; clean English >> gibberish).
     """
-    return _blind_solve(ct, STANDARD, SYMBOL, trifid_decode, periods=periods,
-                        restarts=restarts, seconds_per_start=seconds_per_start,
-                        probe_seconds=probe_seconds, seed=seed)
+    return _blind_solve(
+        ct,
+        STANDARD,
+        SYMBOL,
+        trifid_decode,
+        periods=periods,
+        restarts=restarts,
+        seconds_per_start=seconds_per_start,
+        probe_seconds=probe_seconds,
+        seed=seed,
+    )
 
 
-def solve_bifid6(ct: str, periods=range(3, 23), restarts: int = 40,
-                 seconds_per_start: float = 4.0, probe_seconds: float = 2.0,
-                 seed: int = 0) -> dict:
+def solve_bifid6(
+    ct: str,
+    periods=range(3, 23),
+    restarts: int = 40,
+    seconds_per_start: float = 4.0,
+    probe_seconds: float = 2.0,
+    seed: int = 0,
+) -> dict:
     """Blind 6x6 Bifid/Polybius crack: detect period, greedy square climb.
 
     Returns ``dict(score, plaintext, key, period, ioc, period_ranking)`` where
     ``key`` is the recovered 36-cell alphabet (26 letters + 10 digits).
     """
-    return _blind_solve(ct, STANDARD + DIGITS, "", bifid6_decode, periods=periods,
-                        restarts=restarts, seconds_per_start=seconds_per_start,
-                        probe_seconds=probe_seconds, seed=seed)
+    return _blind_solve(
+        ct,
+        STANDARD + DIGITS,
+        "",
+        bifid6_decode,
+        periods=periods,
+        restarts=restarts,
+        seconds_per_start=seconds_per_start,
+        probe_seconds=probe_seconds,
+        seed=seed,
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -373,22 +438,26 @@ if __name__ == "__main__":
     import sys
 
     # Generic English plaintext source for the synthetic controls / demo.
-    ENGLISH = ("THEQUICKBROWNFOXJUMPSOVERTHELAZYDOGWHILETHEOLDCLOCKINTHEHALL"
-               "STRUCKMIDNIGHTANDTHEWINDCARRIEDTHESCENTOFRAINACROSSTHEQUIET"
-               "FIELDSWHERETHEHARVESTHADLONGSINCEBEENGATHEREDINTOTHEBARNS"
-               "BESIDETHEWEATHEREDFENCETHATMARKEDTHEEDGEOFTHEFARMSTEADLANDS"
-               "ANDTHESILENTWATCHERSTOODGUARDOVERTHESLEEPINGVILLAGEUNTILDAWN")
+    ENGLISH = (
+        "THEQUICKBROWNFOXJUMPSOVERTHELAZYDOGWHILETHEOLDCLOCKINTHEHALL"
+        "STRUCKMIDNIGHTANDTHEWINDCARRIEDTHESCENTOFRAINACROSSTHEQUIET"
+        "FIELDSWHERETHEHARVESTHADLONGSINCEBEENGATHEREDINTOTHEBARNS"
+        "BESIDETHEWEATHEREDFENCETHATMARKEDTHEEDGEOFTHEFARMSTEADLANDS"
+        "ANDTHESILENTWATCHERSTOODGUARDOVERTHESLEEPINGVILLAGEUNTILDAWN"
+    )
     N = 272
 
     budget = float(sys.argv[1]) if len(sys.argv) > 1 else 3.0  # seconds per start
     restarts = int(sys.argv[2]) if len(sys.argv) > 2 else 30
 
-    print(f"calibration: random_ref={_SCORER._random_ref:.3f} "
-          f"english_ref={_SCORER._english_ref:.3f} (avg hexagram log-prob)",
-          flush=True)
+    print(
+        f"calibration: random_ref={_SCORER._random_ref:.3f} "
+        f"english_ref={_SCORER._english_ref:.3f} (avg hexagram log-prob)",
+        flush=True,
+    )
 
     def match(a: str, b: str) -> float:
-        return sum(x == y for x, y in zip(a, b)) / max(1, len(b))
+        return sum(x == y for x, y in zip(a, b, strict=False)) / max(1, len(b))
 
     # ---- 1. Round-trip verification (both ciphers, incl. partial final blocks)
     print("\n=== round-trip verification (N=272, partial final block) ===", flush=True)
@@ -404,8 +473,10 @@ if __name__ == "__main__":
         if bifid6_decode(bifid6_encode(pt272, ba, P), ba, P) != pt272:
             rt_ok = False
             print(f"  Bifid6 P={P}: ROUND-TRIP FAIL", flush=True)
-    print(f"  round-trip {'OK' if rt_ok else 'FAILED'} for Trifid & Bifid6 "
-          f"at P in {{5,7,11,13,17}}", flush=True)
+    print(
+        f"  round-trip {'OK' if rt_ok else 'FAILED'} for Trifid & Bifid6 at P in {{5,7,11,13,17}}",
+        flush=True,
+    )
 
     # The blind crack permutes a 26-/36-cell key; the basin of attraction around the
     # true key is NARROW (a 4-swap perturbation already collapses the hexagram score
@@ -417,70 +488,114 @@ if __name__ == "__main__":
     def plant_decode_match(encode, decode, alpha, period, solver, seed):
         ct = encode(pt272, alpha, period)
         t0 = time.monotonic()
-        res = solver(ct, periods=range(3, 23), restarts=restarts,
-                     seconds_per_start=budget, probe_seconds=budget, seed=seed)
+        res = solver(
+            ct,
+            periods=range(3, 23),
+            restarts=restarts,
+            seconds_per_start=budget,
+            probe_seconds=budget,
+            seed=seed,
+        )
         m = match(res["plaintext"], pt272)
         return res, m, time.monotonic() - t0
 
     # ---- 2. Trifid controls (period 11) ------------------------------------
     print("\n=== CONTROL: blind TRIFID recovery (P=11, N=272) ===", flush=True)
     res_ti, rec_ti, dt = plant_decode_match(
-        trifid_encode, trifid_decode, trifid_alphabet("KRYPTOS"), 11, solve_trifid, 1)
-    print(f"  IN-BASIN (planted KRYPTOS seed): recovered P={res_ti['period']} "
-          f"match={rec_ti:.0%} score={res_ti['score']:.0f} {dt:.0f}s "
-          f"rank5={res_ti['period_ranking'][:5]}", flush=True)
+        trifid_encode, trifid_decode, trifid_alphabet("KRYPTOS"), 11, solve_trifid, 1
+    )
+    print(
+        f"  IN-BASIN (planted KRYPTOS seed): recovered P={res_ti['period']} "
+        f"match={rec_ti:.0%} score={res_ti['score']:.0f} {dt:.0f}s "
+        f"rank5={res_ti['period_ranking'][:5]}",
+        flush=True,
+    )
     rng_k = random.Random(99)
-    rand_letters = list(STANDARD); rng_k.shuffle(rand_letters)
+    rand_letters = list(STANDARD)
+    rng_k.shuffle(rand_letters)
     rand_tri = "".join(rand_letters) + SYMBOL
     res_th, rec_th, dt = plant_decode_match(
-        trifid_encode, trifid_decode, rand_tri, 11, solve_trifid, 11)
-    print(f"  HONEST (fresh random key): recovered P={res_th['period']} "
-          f"match={rec_th:.0%} score={res_th['score']:.0f} {dt:.0f}s", flush=True)
+        trifid_encode, trifid_decode, rand_tri, 11, solve_trifid, 11
+    )
+    print(
+        f"  HONEST (fresh random key): recovered P={res_th['period']} "
+        f"match={rec_th:.0%} score={res_th['score']:.0f} {dt:.0f}s",
+        flush=True,
+    )
 
     # ---- 3. 6x6 Bifid controls (period 9) ----------------------------------
     print("\n=== CONTROL: blind 6x6 BIFID recovery (P=9, N=272) ===", flush=True)
     res_bi, rec_bi, dt = plant_decode_match(
-        bifid6_encode, bifid6_decode, bifid6_alphabet("KRYPTOS"), 9, solve_bifid6, 2)
-    print(f"  IN-BASIN (planted KRYPTOS seed): recovered P={res_bi['period']} "
-          f"match={rec_bi:.0%} score={res_bi['score']:.0f} {dt:.0f}s "
-          f"rank5={res_bi['period_ranking'][:5]}", flush=True)
+        bifid6_encode, bifid6_decode, bifid6_alphabet("KRYPTOS"), 9, solve_bifid6, 2
+    )
+    print(
+        f"  IN-BASIN (planted KRYPTOS seed): recovered P={res_bi['period']} "
+        f"match={rec_bi:.0%} score={res_bi['score']:.0f} {dt:.0f}s "
+        f"rank5={res_bi['period_ranking'][:5]}",
+        flush=True,
+    )
     rng_k2 = random.Random(123)
-    rand_pool = list(STANDARD + DIGITS); rng_k2.shuffle(rand_pool)
+    rand_pool = list(STANDARD + DIGITS)
+    rng_k2.shuffle(rand_pool)
     res_bh, rec_bh, dt = plant_decode_match(
-        bifid6_encode, bifid6_decode, "".join(rand_pool), 9, solve_bifid6, 21)
-    print(f"  HONEST (fresh random key): recovered P={res_bh['period']} "
-          f"match={rec_bh:.0%} score={res_bh['score']:.0f} {dt:.0f}s", flush=True)
+        bifid6_encode, bifid6_decode, "".join(rand_pool), 9, solve_bifid6, 21
+    )
+    print(
+        f"  HONEST (fresh random key): recovered P={res_bh['period']} "
+        f"match={rec_bh:.0%} score={res_bh['score']:.0f} {dt:.0f}s",
+        flush=True,
+    )
 
     # ---- 4. Target panel (interpret ONLY relative to the HONEST ceiling) ----
     # Stand-in for an unknown target: a held-out synthetic encrypted under a
     # FRESH random key not in the seed set. Swap in real ciphertext here.
-    print("\n=== TARGET (interpret ONLY relative to the HONEST control ceiling) ===",
-          flush=True)
+    print("\n=== TARGET (interpret ONLY relative to the HONEST control ceiling) ===", flush=True)
     rng_t = random.Random(2024)
-    rand_target = list(STANDARD); rng_t.shuffle(rand_target)
+    rand_target = list(STANDARD)
+    rng_t.shuffle(rand_target)
     TARGET = trifid_encode(pt272, "".join(rand_target) + SYMBOL, 11)
-    res_p = solve_trifid(TARGET, periods=range(3, 23), restarts=restarts,
-                         seconds_per_start=budget, probe_seconds=budget, seed=3)
-    print(f"  Trifid target: best period={res_p['period']} score={res_p['score']:.0f} "
-          f"ioc={res_p['ioc']:.4f}", flush=True)
+    res_p = solve_trifid(
+        TARGET,
+        periods=range(3, 23),
+        restarts=restarts,
+        seconds_per_start=budget,
+        probe_seconds=budget,
+        seed=3,
+    )
+    print(
+        f"  Trifid target: best period={res_p['period']} score={res_p['score']:.0f} "
+        f"ioc={res_p['ioc']:.4f}",
+        flush=True,
+    )
     print(f"    plain[:80]: {res_p['plaintext'][:80]}", flush=True)
 
     # ---- Verdict: the HONEST controls are the gate -------------------------
     CLEAR = 0.90
     honest_cleared = rec_th >= CLEAR and rec_bh >= CLEAR
     print("\n=== VERDICT ===", flush=True)
-    print(f"  IN-BASIN recovery: Trifid={rec_ti:.0%}  Bifid6={rec_bi:.0%} "
-          f"(sanity: climb+period-detection work end-to-end)", flush=True)
-    print(f"  HONEST recovery:   Trifid={rec_th:.0%}  Bifid6={rec_bh:.0%}  "
-          f"(threshold {CLEAR:.0%}) <-- the gate", flush=True)
+    print(
+        f"  IN-BASIN recovery: Trifid={rec_ti:.0%}  Bifid6={rec_bi:.0%} "
+        f"(sanity: climb+period-detection work end-to-end)",
+        flush=True,
+    )
+    print(
+        f"  HONEST recovery:   Trifid={rec_th:.0%}  Bifid6={rec_bh:.0%}  "
+        f"(threshold {CLEAR:.0%}) <-- the gate",
+        flush=True,
+    )
     if honest_cleared:
-        print("  HONEST controls CLEAR 90% -> blind crack is trustworthy at this "
-              "length; a flat target result here would be a meaningful negative.",
-              flush=True)
+        print(
+            "  HONEST controls CLEAR 90% -> blind crack is trustworthy at this "
+            "length; a flat target result here would be a meaningful negative.",
+            flush=True,
+        )
     else:
-        print("  HONEST controls do NOT clear 90% -> this is the recovery CEILING. "
-              "The cube/square key basin is too narrow to recover blind at this "
-              "length (more text does not help: diffusion is set by period, not "
-              "length). Trifid/6x6 are UNFALSIFIABLE-BY-CRACKING here without a crib; "
-              "do NOT claim the target refuted from a flat result.", flush=True)
+        print(
+            "  HONEST controls do NOT clear 90% -> this is the recovery CEILING. "
+            "The cube/square key basin is too narrow to recover blind at this "
+            "length (more text does not help: diffusion is set by period, not "
+            "length). Trifid/6x6 are UNFALSIFIABLE-BY-CRACKING here without a crib; "
+            "do NOT claim the target refuted from a flat result.",
+            flush=True,
+        )
     sys.exit(0 if rt_ok else 1)

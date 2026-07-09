@@ -182,9 +182,10 @@ def scan(
     def searchaware_p(ioc: float) -> float:
         # Matched-count empirical p: the fraction of replicates whose BEST-over-all-candidates IoC
         # reached `ioc`. This is already multiple-testing correct BY CONSTRUCTION — every replicate
-        # takes the max over the *same* candidate set that was searched on the real text (len(coeffs)
-        # x len(alphabets) functionals), so the null scales with the actual trial count rather than a
-        # fixed correction. Laplace (+1) smoothing keeps it a proper, non-zero empirical p even when
+        # takes the max over the *same* candidate set that was searched on the real text
+        # (len(coeffs) x len(alphabets) functionals), so the null scales with the actual trial
+        # count rather than a fixed correction. Laplace (+1) smoothing keeps it a proper, non-zero
+        # empirical p even when
         # no shuffle reaches the observed IoC (a search that "never" beats it is p<=1/(N+1), not 0).
         if not null_max:
             return 1.0
@@ -214,11 +215,11 @@ def scan(
             }
         )
 
-    best = candidates[0] if candidates else None
-    if best and best["p"] < 0.01 and best["ioc"] > floor + 0.008:
+    top_cand = candidates[0] if candidates else None
+    if top_cand and top_cand["p"] < 0.01 and top_cand["ioc"] > floor + 0.008:
         verdict = (
-            f"relation found: {best['alphabet']} coef={best['coef']} "
-            f"(IoC {best['ioc']} vs floor {round(floor, 4)}, p={best['p']}); "
+            f"relation found: {top_cand['alphabet']} coef={top_cand['coef']} "
+            f"(IoC {top_cand['ioc']} vs floor {round(floor, 4)}, p={top_cand['p']}); "
             f"combine() this channel, then solve its residual sub/transposition"
         )
     else:

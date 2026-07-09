@@ -29,6 +29,7 @@ non-repeating string. Note we deliberately do **not** reuse :func:`transsub.reve
 that detects a *repeating* inner period, which a running key does not have — the correct,
 transposition-invariant discriminator here is whole-text :func:`scoring.index_of_coincidence`.
 """
+
 from __future__ import annotations
 
 from collections.abc import Sequence
@@ -68,8 +69,9 @@ def resolve_alphabet(name: str) -> str:
     return keyed_alphabet(upper)
 
 
-def running_desub(ciphertext: str, key_text: str, *, alphabet: str = "KRYPTOS",
-                  convention: str = "vigenere") -> str:
+def running_desub(
+    ciphertext: str, key_text: str, *, alphabet: str = "KRYPTOS", convention: str = "vigenere"
+) -> str:
     """De-substitute ``ciphertext`` using ``key_text`` as a running key (cycled to length).
 
     Both ciphertext and key are read in ``alphabet`` index space. ``convention`` is one of
@@ -101,8 +103,9 @@ def running_desub(ciphertext: str, key_text: str, *, alphabet: str = "KRYPTOS",
     return "".join(out)
 
 
-def desub_ioc(ciphertext: str, key_text: str, *, alphabet: str = "KRYPTOS",
-              convention: str = "vigenere") -> tuple[float, str]:
+def desub_ioc(
+    ciphertext: str, key_text: str, *, alphabet: str = "KRYPTOS", convention: str = "vigenere"
+) -> tuple[float, str]:
     """De-substitute under one running key/alphabet/convention; return ``(ioc, stream)``."""
     stream = running_desub(ciphertext, key_text, alphabet=alphabet, convention=convention)
     return index_of_coincidence(stream), stream
@@ -126,8 +129,9 @@ def _normalize(key_texts, labels) -> list[tuple[int, str, str]]:
     return [(i, name, text) for i, (name, text) in enumerate(raw) if only_letters(text)]
 
 
-def _peel_columnar(stream: str, scorer: NgramScorer, *, max_width: int
-                   ) -> tuple[float, int, list[int], str]:
+def _peel_columnar(
+    stream: str, scorer: NgramScorer, *, max_width: int
+) -> tuple[float, int, list[int], str]:
     """Best ``(score_per_char, width, read_order, plaintext)`` over a columnar undo.
 
     Width 1 (identity / no transposition) is always a candidate, so a *pure* running-key
@@ -146,6 +150,7 @@ def _peel_columnar(stream: str, scorer: NgramScorer, *, max_width: int
                 best = (s, w, order, pt)
     if max_width > ENUM_MAX_WIDTH:
         from .anagram import solve as _anagram_solve
+
         r = _anagram_solve(stream, widths=range(ENUM_MAX_WIDTH + 1, max_width + 1))
         pt = r.get("plaintext") or ""
         if pt:
@@ -193,23 +198,43 @@ def screen_running_keys(
     ct = only_letters(ciphertext).upper()
     items = _normalize(key_texts, labels)
     if not items:
-        return {"ok": False, "operation": "runkey-screen", "trials": 0, "winner": None,
-                "ranked": [], "recovered": False, "plaintext": "",
-                "note": "no usable key texts"}
+        return {
+            "ok": False,
+            "operation": "runkey-screen",
+            "trials": 0,
+            "winner": None,
+            "ranked": [],
+            "recovered": False,
+            "plaintext": "",
+            "note": "no usable key texts",
+        }
 
     trials: list[dict[str, Any]] = []
     for orig_i, name, text in items:
         for alphabet in alphabets:
             for convention in conventions:
                 ioc, stream = desub_ioc(ct, text, alphabet=alphabet, convention=convention)
-                trials.append({
-                    "label": name, "key_index": orig_i, "alphabet": alphabet,
-                    "convention": convention, "ioc": round(ioc, 4), "_stream": stream,
-                })
+                trials.append(
+                    {
+                        "label": name,
+                        "key_index": orig_i,
+                        "alphabet": alphabet,
+                        "convention": convention,
+                        "ioc": round(ioc, 4),
+                        "_stream": stream,
+                    }
+                )
     if not trials:
-        return {"ok": False, "operation": "runkey-screen", "trials": 0, "winner": None,
-                "ranked": [], "recovered": False, "plaintext": "",
-                "note": "no alphabet/convention to try"}
+        return {
+            "ok": False,
+            "operation": "runkey-screen",
+            "trials": 0,
+            "winner": None,
+            "ranked": [],
+            "recovered": False,
+            "plaintext": "",
+            "note": "no alphabet/convention to try",
+        }
     iocs = [t["ioc"] for t in trials]
     mu = sum(iocs) / len(iocs)
     sd = (sum((v - mu) ** 2 for v in iocs) / len(iocs)) ** 0.5 or 1e-9
@@ -227,13 +252,16 @@ def screen_running_keys(
 
     def _read(stream: str) -> tuple[str, dict[str, Any] | None]:
         raw_cov = long_word_coverage(stream)
-        if raw_cov >= 0.40:                       # already readable: no transposition
+        if raw_cov >= 0.40:  # already readable: no transposition
             return stream, {"transposition": None}
         if peel and len(stream) >= 4:
             _, w, order, pt = _peel_columnar(stream, scorer, max_width=max_width)
             if w > 1:
-                return pt, {"transposition": "columnar", "columnar_width": w,
-                            "columnar_order": order}
+                return pt, {
+                    "transposition": "columnar",
+                    "columnar_width": w,
+                    "columnar_order": order,
+                }
             return pt, {"transposition": None}
         return stream, None
 
@@ -244,6 +272,8 @@ def screen_running_keys(
         qs = scorer.score(pt) / max(1, len(pt))
         if best is None or (wc, qs) > (best[0], best[1]):
             best = (wc, qs, t, pt, struct)
+    # reveal_trials is always non-empty (`... or [top]` above), so the loop ran at least once.
+    assert best is not None
     word_cov, qscore, win, plaintext, structure = best
     transposed_english = win["ioc"] >= reveal_ioc
     recovered = word_cov >= 0.40 and qscore >= sig["qscore_per_char"] - 0.4
@@ -265,11 +295,17 @@ def screen_running_keys(
         z_outlier = None
     # If the winner reveals transposed-English but didn't read out, the columnar may be wider
     # than the peel ceiling — tell the caller rather than silently returning a near-miss.
-    width_hint = (transposed_english and not recovered and peel
-                  and (structure or {}).get("transposition") != "columnar")
+    width_hint = (
+        transposed_english
+        and not recovered
+        and peel
+        and (structure or {}).get("transposition") != "columnar"
+    )
 
-    ranked = [{k: t[k] for k in ("label", "key_index", "alphabet", "convention", "ioc", "z")}
-              for t in trials]
+    ranked = [
+        {k: t[k] for k in ("label", "key_index", "alphabet", "convention", "ioc", "z")}
+        for t in trials
+    ]
     for r in ranked:
         r["transposed_english"] = r["ioc"] >= reveal_ioc
     out = {
@@ -277,9 +313,13 @@ def screen_running_keys(
         "operation": "runkey-screen",
         "trials": len(trials),
         "winner": {
-            "label": win["label"], "key_index": win["key_index"],
-            "alphabet": win["alphabet"], "convention": win["convention"],
-            "ioc": win["ioc"], "z": win["z"], "z_outlier": z_outlier,
+            "label": win["label"],
+            "key_index": win["key_index"],
+            "alphabet": win["alphabet"],
+            "convention": win["convention"],
+            "ioc": win["ioc"],
+            "z": win["z"],
+            "z_outlier": z_outlier,
             "transposed_english": transposed_english,
         },
         "ranked": ranked,
@@ -292,6 +332,8 @@ def screen_running_keys(
         "recovered": bool(recovered),
     }
     if width_hint:
-        out["note"] = (f"winner reveals transposed-English (IoC {win['ioc']}) but did not read "
-                       f"out — the columnar may be wider than max_width={max_width}; raise it.")
+        out["note"] = (
+            f"winner reveals transposed-English (IoC {win['ioc']}) but did not read "
+            f"out — the columnar may be wider than max_width={max_width}; raise it."
+        )
     return out

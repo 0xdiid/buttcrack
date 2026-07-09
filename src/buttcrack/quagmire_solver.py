@@ -34,7 +34,7 @@ from __future__ import annotations
 
 import math
 import random
-from typing import Iterable, Sequence
+from collections.abc import Iterable, Sequence
 
 try:  # normal package import
     from .scoring import index_of_coincidence, resolve_scorer
@@ -55,11 +55,11 @@ KRYPTOS_ALPHABET = "KRYPTOSABCDEFGHIJLMNQUVWXZ"
 # ``linked`` ties the two together (Quag III: PA == CA).
 _KIND_SPEC = {
     # name        : (pt_keyed, ct_keyed, linked)
-    "vigenere":     (False, False, False),
-    "quagmire1":    (True,  False, False),
-    "quagmire2":    (False, True,  False),
-    "quagmire3":    (True,  True,  True),
-    "quagmire4":    (True,  True,  False),
+    "vigenere": (False, False, False),
+    "quagmire1": (True, False, False),
+    "quagmire2": (False, True, False),
+    "quagmire3": (True, True, True),
+    "quagmire4": (True, True, False),
 }
 
 
@@ -99,7 +99,9 @@ def _encrypt(pt: str, pa: str, ca: str, shifts: Sequence[int], beaufort: bool = 
     return "".join(out)
 
 
-def _best_shifts(ct: str, pa: str, ca: str, p: int, scorer, beaufort: bool = False) -> tuple[list[int], float]:
+def _best_shifts(
+    ct: str, pa: str, ca: str, p: int, scorer, beaufort: bool = False
+) -> tuple[list[int], float]:
     """For fixed alphabets, pick the best per-period shift independently.
 
     Each period column is a simple substituted Caesar; we score each candidate
@@ -133,11 +135,31 @@ def _best_shifts(ct: str, pa: str, ca: str, p: int, scorer, beaufort: bool = Fal
 
 # English letter frequencies for the cheap per-column chi-squared.
 _ENG = {
-    "A": 0.08167, "B": 0.01492, "C": 0.02782, "D": 0.04253, "E": 0.12702,
-    "F": 0.02228, "G": 0.02015, "H": 0.06094, "I": 0.06966, "J": 0.00153,
-    "K": 0.00772, "L": 0.04025, "M": 0.02406, "N": 0.06749, "O": 0.07507,
-    "P": 0.01929, "Q": 0.00095, "R": 0.05987, "S": 0.06327, "T": 0.09056,
-    "U": 0.02758, "V": 0.00978, "W": 0.02360, "X": 0.00150, "Y": 0.01974,
+    "A": 0.08167,
+    "B": 0.01492,
+    "C": 0.02782,
+    "D": 0.04253,
+    "E": 0.12702,
+    "F": 0.02228,
+    "G": 0.02015,
+    "H": 0.06094,
+    "I": 0.06966,
+    "J": 0.00153,
+    "K": 0.00772,
+    "L": 0.04025,
+    "M": 0.02406,
+    "N": 0.06749,
+    "O": 0.07507,
+    "P": 0.01929,
+    "Q": 0.00095,
+    "R": 0.05987,
+    "S": 0.06327,
+    "T": 0.09056,
+    "U": 0.02758,
+    "V": 0.00978,
+    "W": 0.02360,
+    "X": 0.00150,
+    "Y": 0.01974,
     "Z": 0.00074,
 }
 
@@ -151,7 +173,7 @@ def _col_chi(decoded_freq: Sequence[int], pa: str) -> float:
     n = sum(decoded_freq)
     if n == 0:
         return math.inf
-    letter_counts = {}
+    letter_counts: dict[str, int] = {}
     for i, cnt in enumerate(decoded_freq):
         if cnt:
             letter_counts[pa[i]] = letter_counts.get(pa[i], 0) + cnt
@@ -341,25 +363,29 @@ def solve(
         # auto iteration budget: longer alphabets / shorter text -> more iters
         it = iters if iters is not None else max(600, min(4000, 1500 + 40 * p))
         p_best = None
-        for r in range(restarts):
-            score, pa, ca, shifts, pt = _anneal_one(
-                ct, p, spec, scorer, rng, it
-            )
+        for _r in range(restarts):
+            score, pa, ca, shifts, pt = _anneal_one(ct, p, spec, scorer, rng, it)
             if p_best is None or score > p_best[0]:
                 p_best = (score, pa, ca, shifts, pt)
+        if p_best is None:
+            # No restarts ran (restarts < 1): nothing to polish for this period.
+            continue
         # polish the period's best
-        score, pa, ca, shifts, pt = _polish(
-            ct, p_best[1], p_best[2], p_best[3], spec, scorer, rng
-        )
+        score, pa, ca, shifts, pt = _polish(ct, p_best[1], p_best[2], p_best[3], spec, scorer, rng)
         if verbose:
             ic = index_of_coincidence(pt)
             print(f"  period {p:2d}: score={score:.4f} IoC={ic:.4f} {pt[:48]}")
         if best is None or score > best[0]:
             best = (score, pa, ca, shifts, pt, p)
 
+    if best is None:
+        # Every candidate period was out of range for this ciphertext (or restarts < 1),
+        # so no solution was produced. Fail loudly instead of unpacking None.
+        raise ValueError(f"no valid period in {periods} for ciphertext of length {n}")
     score, pa, ca, shifts, pt, period = best
     alphabet = pa if spec[0] else (ca if spec[1] else ALPHABET)
     from .validate import solve_confidence
+
     conf = solve_confidence(pt, len(ct))
     return {
         "score": score,
@@ -414,9 +440,7 @@ def solve_fixed_alphabet(
     beaufort = kind == "beaufort"
     spec_kind = "quagmire3" if beaufort else kind
     if spec_kind not in _KIND_SPEC:
-        raise ValueError(
-            f"unknown kind {kind!r}; choose from {sorted(_KIND_SPEC) + ['beaufort']}"
-        )
+        raise ValueError(f"unknown kind {kind!r}; choose from {sorted(_KIND_SPEC) + ['beaufort']}")
     if scorer is None:
         scorer = resolve_scorer("hexagrams")
     pt_keyed, ct_keyed, linked = _KIND_SPEC[spec_kind]
@@ -444,7 +468,10 @@ def solve_fixed_alphabet(
             improved = False
             for j in range(p):
                 cur = shifts[j]
-                best_s, best_sc = cur, scorer.fitness(_decrypt(ct, pa, ca, shifts, beaufort=beaufort))
+                best_s, best_sc = (
+                    cur,
+                    scorer.fitness(_decrypt(ct, pa, ca, shifts, beaufort=beaufort)),
+                )
                 for s in range(26):
                     if s == cur:
                         continue
@@ -465,6 +492,7 @@ def solve_fixed_alphabet(
     score, shifts, pt, period = best
     alpha_out = pa if pt_keyed else (ca if ct_keyed else ALPHABET)
     from .validate import solve_confidence
+
     conf = solve_confidence(pt, len(ct))
     return {
         "score": score,
@@ -497,7 +525,7 @@ if __name__ == "__main__":
         m = min(len(a), len(b))
         if m == 0:
             return 0.0
-        return sum(x == y for x, y in zip(a[:m], b[:m])) / m
+        return sum(x == y for x, y in zip(a[:m], b[:m], strict=False)) / m
 
     scorer = resolve_scorer("hexagrams")
     print(f"scorer: {scorer.name} (n={scorer.n}); reference length: {len(REF)} letters")
@@ -508,10 +536,13 @@ if __name__ == "__main__":
     p13 = 13
     true_shifts = [rng.randrange(26) for _ in range(p13)]
     ct1 = _encrypt(REF, pa, ca, true_shifts)
-    print(f"\n[Test 1] Quagmire III  period={p13}  "
-          f"true key={''.join(ALPHABET[s] for s in true_shifts)}")
-    res1 = solve(ct1, periods=[p13], kind="quagmire3", restarts=24, seed=1,
-                 scorer=scorer, verbose=True)
+    print(
+        f"\n[Test 1] Quagmire III  period={p13}  "
+        f"true key={''.join(ALPHABET[s] for s in true_shifts)}"
+    )
+    res1 = solve(
+        ct1, periods=[p13], kind="quagmire3", restarts=24, seed=1, scorer=scorer, verbose=True
+    )
     cm1 = _charmatch(res1["plaintext"], REF)
     print(f"  recovered alphabet: {res1['alphabet']}")
     print(f"  recovered key     : {res1['key']}")
@@ -524,28 +555,33 @@ if __name__ == "__main__":
     vshifts = [ALPHABET.index(c) for c in keyword]
     ct2 = _encrypt(REF, ALPHABET, ALPHABET, vshifts)
     print(f"\n[Test 2] Vigenere      period=10  true key={keyword}")
-    res2 = solve(ct2, periods=[10], kind="vigenere", restarts=12, seed=2,
-                 scorer=scorer, verbose=True)
+    res2 = solve(
+        ct2, periods=[10], kind="vigenere", restarts=12, seed=2, scorer=scorer, verbose=True
+    )
     cm2 = _charmatch(res2["plaintext"], REF)
     print(f"  recovered key     : {res2['key']}")
     print(f"  char-match        : {cm2:.1%}")
     print(f"  plaintext[:80]    : {res2['plaintext'][:80]}")
 
     # ---- Test 3 (bonus): blind period sweep for the Quag III sample ----
-    print(f"\n[Test 3] Quagmire III blind period sweep 8..16")
-    res3 = solve(ct1, periods=range(8, 17), kind="quagmire3", restarts=8, seed=3,
-                 scorer=scorer)
+    print("\n[Test 3] Quagmire III blind period sweep 8..16")
+    res3 = solve(ct1, periods=range(8, 17), kind="quagmire3", restarts=8, seed=3, scorer=scorer)
     cm3 = _charmatch(res3["plaintext"], REF)
-    print(f"  found period={res3['period']}  char-match={cm3:.1%}  "
-          f"plaintext[:60]={res3['plaintext'][:60]}")
+    print(
+        f"  found period={res3['period']}  char-match={cm3:.1%}  "
+        f"plaintext[:60]={res3['plaintext'][:60]}"
+    )
 
     print("\n=== RESULTS ===")
     print(f"Test1 (Quag III p13): {cm1:.1%}  -> {'PASS' if cm1 >= 0.85 else 'FAIL'}")
     print(f"Test2 (Vigenere p10): {cm2:.1%}  -> {'PASS' if cm2 >= 0.85 else 'FAIL'}")
-    print(f"Test3 (blind sweep) : {cm3:.1%}  period={res3['period']}  "
-          f"-> {'PASS' if cm3 >= 0.85 else 'FAIL'}")
+    print(
+        f"Test3 (blind sweep) : {cm3:.1%}  period={res3['period']}  "
+        f"-> {'PASS' if cm3 >= 0.85 else 'FAIL'}"
+    )
 
     overall = cm1 >= 0.85 and cm2 >= 0.85
     print(f"\nOVERALL: {'PASS' if overall else 'FAIL'}")
     import sys
+
     sys.exit(0 if overall else 1)

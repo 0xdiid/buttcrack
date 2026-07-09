@@ -625,3 +625,59 @@ from buttcrack.hill_kpa import solve_mod26, recover_matrix, recover_affine
 recover_matrix(known_pt, ct, n=3, alphabet="STD", offset=0)   # crib may start mid-message
 recover_affine(known_pt, ct, n=3, q=2, alphabet="KRYPTOS")     # matrix + period-q additive
 ```
+
+## 17. The coset-preserving transposition: an honest, provable blind wall
+
+§9(b) says a transposition under a periodic substitution is peelable because undoing the right
+order makes the per-column IoC spike **reappear** (`reveal_score` has a gradient before you solve
+the sub). There is one shape where that lever fails *by construction*, and recognising it saves you
+from an unwinnable search: a **coset-preserving** transposition — one that permutes letters only
+*within* each residue class mod the substitution period `p` (each mod-`p` column is scrambled
+internally, never across columns).
+
+- It leaves **every coset's multiset unchanged**, so **coset-IoC is invariant under it** — the raw
+  spectrum already shows the period, and no un-winding changes it. `reveal_score` is flat across all
+  candidate orders: there is nothing to reappear.
+- It kills **kappa(p)** (the within-column *adjacency* is destroyed) while preserving the coset
+  distributions — the fingerprint of "peaked in multiset but order-scrambled".
+- Consequence: at a single message length the winding is **not blind-detectable** and the
+  per-coset key is **not blind-recoverable** — the space of within-coset permutations is `(n/p)!`
+  per coset and no statistic ranks it. This is a genuine information wall, not a missing solver.
+
+**Two things follow, both now tooled.**
+
+1. **Calibrate coset statistics with the RIGHT null.** A coset-IoC "spike" must be compared to a
+   null that *also* preserves the cosets — otherwise a plain letter-shuffle null (which destroys the
+   cosets) is trivially beaten and manufactures a false positive. Use
+   `windings.coset_preserving_shuffle(ct, p, rng=…)` (shuffles only within each residue class) as the
+   null twin; `windings` also generates the coset-preserving permutations themselves (affine / fold /
+   faro per class) and triangular (`T_n`) reads for the winding search.
+2. **Past the wall, you need external information, not more search.** A crib (§4b/§16a), or — the
+   high-value move in a chain — the **sibling**: if two unsolved messages share the construction, the
+   pair carries roughly twice the data of either alone. `butt compare ct_a ct_b` tests exactly that
+   (sorted-frequency-profile distance, a shared period/kappa signature — including the tell of *one
+   wound, one flat* = same substitution, different winding — and a two-ciphertext additive
+   superimposition), so you learn whether to attack them jointly before you invest.
+
+## 18. Look-elsewhere: a period SCAN needs the family null too (`butt stats --family`)
+
+§10 calibrates a *searched transposition* against the shuffled search. The identical bias hits a
+**period scan**: `calibrated_periods` / `kappa_spectrum` report a *per-period* z, but you keep the
+best of 15–50 periods, so the maximum is selection-inflated. A per-period `z ≈ +3` on a short
+message is routinely multiplicity noise. `butt stats --family` (`analysis.period_family_significance`)
+reports the honest number: the strongest period's calibrated z vs the distribution of the **max
+calibrated z over the whole grid** on shuffles of the same letters. Believe a period only when it
+clears that family null (`beats_null_max` / small `family_p`), not merely on a high per-period z —
+random text will hand you a period at `z ≈ +2.5` that dies at `family_p ≈ 0.3`.
+
+## 19. Non-prose payloads: the right decrypt can score as gibberish
+
+A quadgram (or word-coverage) gate assumes the plaintext is **prose**. A message that is a **route,
+a coordinate list, spelled numbers, or a table** is real language token-by-token but scores in the
+English "ghost band" — so a correct decryption can be *rejected* by an English-only objective, and a
+whole search silently discards the answer. Two levers: pass a **custom scorer** to the crib/Hill
+paths (`crib_drag(..., scorer=…)`) that rewards the payload's structure, and screen surviving
+candidates with `butt nonprose` (a route/instruction genre model vs a prose model, anchor-normalized)
+— `leans_nonprose` flags a candidate that reads as directions/coordinates even though the prose score
+looks weak. When the aligned-coset modal is well above prose's ~0.12, suspect a structured payload
+and stop trusting the English gate.

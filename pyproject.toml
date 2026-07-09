@@ -24,7 +24,10 @@ classifiers = [
 dependencies = []
 
 [project.optional-dependencies]
-dev = ["pytest>=7", "pytest-xdist>=3", "ruff>=0.6", "mypy>=1.8"]
+# numpy is an *optional* runtime accelerator (analysis.py falls back to pure
+# Python when it is absent), but the test suite uses it as a cross-check oracle
+# and analysis.py's vectorized path assumes it in dev/test — so it ships here.
+dev = ["pytest>=7", "pytest-xdist>=3", "ruff>=0.6", "mypy>=1.8", "numpy>=1.24"]
 
 [project.scripts]
 butt = "buttcrack.cli:main"
@@ -62,7 +65,10 @@ select = ["E", "F", "I", "W", "UP", "B"]
 ignore = ["B008"]
 
 [tool.mypy]
-python_version = "3.10"
+# Target 3.12 (not the 3.10 floor) so mypy can parse numpy's PEP 695 (`type X =`)
+# stubs, which it rejects under an older target. Runtime 3.10 support is guarded by
+# ruff's `target-version = "py310"` and the 3.10 leg of the CI test matrix.
+python_version = "3.12"
 files = ["src/buttcrack"]
 ignore_missing_imports = true
 warn_unused_ignores = true

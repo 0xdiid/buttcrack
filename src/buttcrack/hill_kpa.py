@@ -38,7 +38,7 @@ def _solve_prime(A: list[list[int]], b: list[int], p: int) -> list[list[int]] | 
     Returns a list of solution vectors (``p ** free`` of them), or ``None`` if the system
     is inconsistent. Rank-deficient systems enumerate the free variables.
     """
-    rows = [[x % p for x in row] + [bi % p] for row, bi in zip(A, b)]
+    rows = [[x % p for x in row] + [bi % p] for row, bi in zip(A, b, strict=False)]
     ncols = len(A[0])
     pivots: list[int] = []
     r = 0
@@ -66,7 +66,7 @@ def _solve_prime(A: list[list[int]], b: list[int], p: int) -> list[list[int]] | 
     sols: list[list[int]] = []
     for combo in itertools.product(range(p), repeat=len(free)):
         x = [0] * ncols
-        for c, v in zip(free, combo):
+        for c, v in zip(free, combo, strict=False):
             x[c] = v
         for c in pivots:
             row = rows[piv_row[c]]
@@ -223,9 +223,7 @@ def crib_drag(
                 for row in inv:
                     out.append(alpha[sum(row[k] * block[k] for k in range(n)) % 26])
             pt = "".join(out)
-            results.append(
-                {"offset": offset, "matrix": K, "plaintext": pt, "score": scorer(pt)}
-            )
+            results.append({"offset": offset, "matrix": K, "plaintext": pt, "score": scorer(pt)})
     results.sort(key=lambda r: r["score"], reverse=True)
     return results[:top]
 

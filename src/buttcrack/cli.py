@@ -26,6 +26,7 @@ from . import (
 from .identify import identify as identify_text
 from .result import SCHEMA_VERSION, VERDICT_VALUES, CrackResult
 from .scoring import LANGUAGES, ngram_table_available
+from .text import only_letters
 
 #: selectable n-gram fitness models for `crack`/`auto` (--ngrams). quintgrams and
 #: hexagrams ARE bundled (english_*.txt) — the higher orders sharpen real-English vs
@@ -195,8 +196,10 @@ def _cmd_crib(args) -> int:
             pr = args.p_range or [5, 20]
             qr = args.q_range or [5, 21]
             cands = crib_mod.product_crib_sweep(
-                text, [args.crib],
-                p_range=range(pr[0], pr[1] + 1), q_range=range(qr[0], qr[1] + 1),
+                text,
+                [args.crib],
+                p_range=range(pr[0], pr[1] + 1),
+                q_range=range(qr[0], qr[1] + 1),
                 alphabet=args.alphabet,
             )
             out = {"ok": True, "operation": "crib-product-sweep", "candidates": cands}
@@ -204,33 +207,54 @@ def _cmd_crib(args) -> int:
         return 0
     if getattr(args, "autokey", False):
         cands = crib_mod.autokey_crib_unzip(text, [args.crib])
-        print(json.dumps({"ok": True, "operation": "crib-autokey", "candidates": cands},
-                         ensure_ascii=False, indent=indent))
+        print(
+            json.dumps(
+                {"ok": True, "operation": "crib-autokey", "candidates": cands},
+                ensure_ascii=False,
+                indent=indent,
+            )
+        )
         return 0
     if getattr(args, "keyed", False):
         drag = crib_mod.keyed_alphabet_crib_drag(text, args.crib, alphabet=args.alphabet)
-        print(json.dumps({"ok": True, "operation": "crib-keyed", "placements": drag},
-                         ensure_ascii=False, indent=indent))
+        print(
+            json.dumps(
+                {"ok": True, "operation": "crib-keyed", "placements": drag},
+                ensure_ascii=False,
+                indent=indent,
+            )
+        )
         return 0
     if getattr(args, "inner_columnar", False):
         from . import cribbing
         from .text import only_letters
+
         ct = only_letters(text)
         n = len(ct)
         widths = args.widths or [w for w in range(2, 33) if n % w == 0]
         pr = args.periods or [9, 16]
-        res = cribbing.solve(
-            ct, only_letters(args.crib), widths=widths, periods=range(pr[0], pr[1] + 1),
+        sol = cribbing.solve(
+            ct,
+            only_letters(args.crib),
+            widths=widths,
+            periods=range(pr[0], pr[1] + 1),
         )
         if args.json or args.compact:
-            print(json.dumps({"ok": True, "operation": "crib-inner-columnar", "result": res},
-                             ensure_ascii=False, indent=indent))
-        elif res is None:
+            print(
+                json.dumps(
+                    {"ok": True, "operation": "crib-inner-columnar", "result": sol},
+                    ensure_ascii=False,
+                    indent=indent,
+                )
+            )
+        elif sol is None:
             print("crib-inner-columnar: no consistent solution (crib/widths/periods may be wrong)")
         else:
-            print(f"[crib-inner-columnar w{res['width']} p{res['period']} "
-                  f"{res['alphabet']}/{res['variant']}] score={res['score']:.3f}")
-            print(res["plaintext"])
+            print(
+                f"[crib-inner-columnar w{sol['width']} p{sol['period']} "
+                f"{sol['alphabet']}/{sol['variant']}] score={sol['score']:.3f}"
+            )
+            print(sol["plaintext"])
         return 0
     drag = crib_mod.crib_drag(text, args.crib, top=args.top)
     if args.json or args.compact:
@@ -288,12 +312,15 @@ def _cmd_transsub(args) -> int:
     unit = getattr(args, "unit", 1)
     indent = None if getattr(args, "compact", False) else 2
 
-    # --- reveal-tool modes (expose the composable block-transposition reveal primitives on the CLI) ---
+    # --- reveal-tool modes (expose the composable block-transposition reveal primitives on the
+    # CLI) ---
     if getattr(args, "spectrum", False):
         units = (1, unit) if unit != 1 else (1, 3)
         spec = reveal_spectrum(
-            text, widths=range(args.min_width, args.max_width + 1),
-            periods=_parse_period_range(args.periods), units=tuple(dict.fromkeys(units)),
+            text,
+            widths=range(args.min_width, args.max_width + 1),
+            periods=_parse_period_range(args.periods),
+            units=tuple(dict.fromkeys(units)),
         )
         print(json.dumps(spec, ensure_ascii=False, indent=indent))
         return 0 if (spec.get("best") or {}).get("verdict") == "beats null" else 1
@@ -302,7 +329,10 @@ def _cmd_transsub(args) -> int:
         if not orders:
             raise InputError("--orders given but no valid read-orders parsed")
         res = sweep_known_alphabet(
-            text, orders, alphabet=args.alphabet, unit=unit,
+            text,
+            orders,
+            alphabet=args.alphabet,
+            unit=unit,
             periods=_parse_period_range(args.periods),
         )
         for c in res["candidates"]:
@@ -311,8 +341,12 @@ def _cmd_transsub(args) -> int:
         return 0 if any(c["recovered"] for c in res["candidates"]) else 1
     if getattr(args, "enum", False):
         res = crack_columnar_reveal_enum(
-            text, scorer, widths=range(args.min_width, args.max_width + 1),
-            alphabet=args.alphabet, unit=unit, rng=rng,
+            text,
+            scorer,
+            widths=range(args.min_width, args.max_width + 1),
+            alphabet=args.alphabet,
+            unit=unit,
+            rng=rng,
         )
         if res.get("structure", {}).get("columnar_order") is not None:
             res["structure"]["generator"] = keyfinder.describe_permutation(
@@ -332,7 +366,11 @@ def _cmd_transsub(args) -> int:
             )
         lengths = [int(x) for x in str(args.lengths).split(",") if x.strip()]
         result = crack_double_columnar_keywords(
-            text, scorer, lengths=lengths, wordlist=keywords, alphabet=args.alphabet,
+            text,
+            scorer,
+            lengths=lengths,
+            wordlist=keywords,
+            alphabet=args.alphabet,
             unit=getattr(args, "unit", 1),
         )
         indent = None if getattr(args, "compact", False) else 2
@@ -394,10 +432,15 @@ def _cmd_runkey(args) -> int:
         raise InputError("provide at least one --keytext or --keytext-file")
 
     result = screen_running_keys(
-        text, key_texts, labels=labels, scorer=scorer,
+        text,
+        key_texts,
+        labels=labels,
+        scorer=scorer,
         alphabets=tuple(a.strip() for a in args.alphabets.split(",") if a.strip()),
         conventions=tuple(c.strip() for c in args.conventions.split(",") if c.strip()),
-        max_width=args.max_width, peel=not args.no_peel, reveal_ioc=args.ioc_floor,
+        max_width=args.max_width,
+        peel=not args.no_peel,
+        reveal_ioc=args.ioc_floor,
     )
     shown = dict(result)
     shown["ranked"] = result.get("ranked", [])[: args.top]
@@ -440,6 +483,257 @@ def _cmd_runkey(args) -> int:
     return 0 if result.get("recovered") else 1
 
 
+def _word_vocab(spec: str | None) -> list[str]:
+    """Parse a vocabulary spec: ``@file`` (whitespace-separated) or a comma/space list."""
+    if not spec:
+        return []
+    if spec.startswith("@"):
+        with open(spec[1:], encoding="utf-8") as fh:
+            return [w for w in fh.read().split() if w]
+    return [w for w in spec.replace(",", " ").split() if w]
+
+
+def _cmd_keysource(args) -> int:
+    from .keysources import compose_key, decompose_key, keys_from_corpus
+
+    json_mode = args.json or getattr(args, "compact", False)
+
+    def _out(obj: dict) -> None:
+        indent = None if getattr(args, "compact", False) else 2
+        print(json.dumps(obj, ensure_ascii=False, indent=indent))
+
+    if args.compose:
+        word_a, word_b = args.compose
+        key = compose_key(word_a, word_b, alphabet=args.alphabet, convention=args.convention)
+        obj = {
+            "mode": "compose",
+            "word_a": word_a.upper(),
+            "word_b": word_b.upper(),
+            "alphabet": args.alphabet.upper(),
+            "convention": args.convention,
+            "period": len(key),
+            "key": key,
+        }
+        _out(obj) if json_mode else print(f"composed key (period {len(key)}): {key}")
+        return 0
+
+    if args.decompose:
+        vocab = _word_vocab(args.words)
+        if not vocab:
+            raise InputError("--decompose needs a --words vocabulary (comma list or @file)")
+        pairs = decompose_key(
+            args.decompose, vocab, alphabet=args.alphabet, convention=args.convention
+        )
+        if json_mode:
+            _out({"mode": "decompose", "key": only_letters(args.decompose).upper(), "pairs": pairs})
+        elif not pairs:
+            print("no word pair in the vocabulary composes that key", file=sys.stderr)
+            return 1
+        else:
+            for pr in pairs:
+                print(
+                    f"{pr['word_a']} + {pr['word_b']}  (period {pr['period']}, {pr['convention']})"
+                )
+        return not pairs
+
+    corpus: list[str] = list(args.corpus or [])
+    for path in args.corpus_file or []:
+        with open(path, encoding="utf-8") as fh:
+            corpus.append(fh.read())
+    if not corpus:
+        raise InputError("provide --corpus/--corpus-file to derive keys, or --compose/--decompose")
+    cands = keys_from_corpus(
+        corpus, min_word=args.min_word, window_lengths=tuple(args.windows or ())
+    )
+
+    target = None
+    if getattr(args, "text", None) not in (None, "-") or getattr(args, "file", None):
+        target = _resolve_text(args)
+
+    if target:
+        from .runkey import screen_running_keys
+        from .scoring import resolve_scorer
+
+        run_kinds = ("full", "acrostic-sentence", "acrostic-line", "reverse:full")
+        picks = [c for c in cands if c["kind"] in run_kinds]
+        screen = screen_running_keys(
+            target,
+            [c["value"] for c in picks],
+            labels=[f"{c['source']}/{c['kind']}" for c in picks],
+            scorer=resolve_scorer("quadgrams", args.lang),
+        )
+        shown = dict(screen)
+        shown["ranked"] = screen.get("ranked", [])[: args.top]
+        if json_mode:
+            _out(
+                {
+                    "mode": "screen",
+                    "candidate_count": len(cands),
+                    "screened": len(picks),
+                    "screen": shown,
+                }
+            )
+        else:
+            w = screen.get("winner")
+            if not w:
+                print("no derived running key produced an IoC outlier", file=sys.stderr)
+                return 1
+            print(f"keysource screen: {len(picks)} running-key candidates from corpus")
+            print(
+                f"winner: {w['label']} {w['alphabet']}/{w['convention']} "
+                f"IoC={w['ioc']:.4f} z={w['z']:.1f}"
+            )
+            if screen.get("recovered"):
+                print(f"plaintext: {screen.get('plaintext')}")
+        return 0 if screen.get("recovered") else 1
+
+    if json_mode:
+        _out({"mode": "derive", "count": len(cands), "candidates": cands[: args.top]})
+    else:
+        for c in cands[: args.top]:
+            print(f"[{c['kind']:<18}] {c['value'][:60]}  (from {c['source']})")
+        if len(cands) > args.top:
+            print(f"... {len(cands) - args.top} more (raise --top or use --json)")
+    return 0
+
+
+def _cmd_validate(args) -> int:
+    from .validate import genuine_solve_signature, make_synthetic, positive_control
+
+    spec = {"structure": args.structure}
+    key: dict = {"substitution": args.substitution, "alphabet": args.alphabet}
+    if args.sub_key:
+        key["sub_key"] = args.sub_key
+    if args.columnar_keyword:
+        key["columnar_keyword"] = args.columnar_keyword
+    if args.columnar_keywords:
+        key["columnar_keywords"] = _word_vocab(args.columnar_keywords)
+
+    synth = make_synthetic(spec, args.plaintext, key=key, length=args.length)
+    out = {
+        "structure": synth["structure"],
+        "length": synth["length"],
+        "ciphertext": synth["ciphertext"],
+        "plaintext": synth["plaintext"],
+        "key": {k: v for k, v in synth["key"].items() if k != "structure"},
+        "signature": genuine_solve_signature(synth["length"]),
+    }
+    if args.self_check:
+
+        def _attack(ct: str) -> str:
+            res = engine.auto(ct, per_cipher_timeout=args.timeout)
+            best = res.best()
+            return best.plaintext if best else ""
+
+        out["self_check"] = positive_control(
+            _attack, spec, key, plaintext=args.plaintext, length=args.length
+        )
+
+    if args.json or getattr(args, "compact", False):
+        indent = None if getattr(args, "compact", False) else 2
+        print(json.dumps(out, ensure_ascii=False, indent=indent))
+    else:
+        print(f"synthetic [{out['structure']}] len={out['length']}")
+        print(f"ciphertext: {out['ciphertext']}")
+        print(f"plaintext:  {out['plaintext']}")
+        sig = out["signature"]
+        bar = f"qscore/char>={sig['qscore_per_char']}  word_cov>={sig['word_cov']}"
+        print(f"genuine-solve bar: {bar}")
+        if args.self_check:
+            sc = out["self_check"]
+            verdict = "RECOVERED" if sc["recovered"] else "did NOT recover"
+            print(
+                f"self-check (butt auto): {verdict}  "
+                f"(word_cov={sc['word_cov']}, preview={sc['decode_preview']!r})"
+            )
+    return 0
+
+
+def _cmd_hillkpa(args) -> int:
+    from .ciphers.hill import matrix_to_key
+    from .hill_kpa import crib_drag
+
+    ct = _resolve_text(args)
+    results = crib_drag(args.crib, ct, args.size, alphabet=args.alphabet, top=args.top)
+    out = {
+        "block_size": args.size,
+        "alphabet": args.alphabet.upper(),
+        "crib": only_letters(args.crib).upper(),
+        "count": len(results),
+        "results": [
+            {
+                "offset": r["offset"],
+                "key": matrix_to_key(r["matrix"]),
+                "score": round(r["score"], 4),
+                "plaintext": r["plaintext"],
+            }
+            for r in results
+        ],
+    }
+    if args.json or getattr(args, "compact", False):
+        indent = None if getattr(args, "compact", False) else 2
+        print(json.dumps(out, ensure_ascii=False, indent=indent))
+    elif not results:
+        print(
+            "no invertible key recovered (crib too short, wrong n, or wrong alphabet?)",
+            file=sys.stderr,
+        )
+        return 1
+    else:
+        best = out["results"][0]
+        print(f"hill KPA (n={args.size}, {args.alphabet.upper()}): {len(results)} key(s)")
+        print(f"best: offset={best['offset']} key={best['key']} score={best['score']}")
+        print(f"plaintext: {best['plaintext']}")
+    return 0 if results else 1
+
+
+def _cmd_compare(args) -> int:
+    from .compare import compare
+
+    text_a = _resolve_text(args)
+    if args.with_text is not None:
+        text_b = args.with_text
+    elif args.with_file:
+        with open(args.with_file, encoding="utf-8") as fh:
+            text_b = fh.read()
+    else:
+        raise InputError("provide the second ciphertext via --with TEXT or --with-file PATH")
+
+    res = compare(text_a, text_b, max_period=args.max_period)
+    if args.json or getattr(args, "compact", False):
+        indent = None if getattr(args, "compact", False) else 2
+        print(json.dumps(res, ensure_ascii=False, indent=indent))
+    else:
+        v = res["verdict"]
+        print(
+            f"compare: len {res['len_a']} vs {res['len_b']}  "
+            f"IoC {res['ioc_a']:.3f}/{res['ioc_b']:.3f}"
+        )
+        print(
+            f"freq-profile L1: a~b={res['freq_profile_l1']:.3f}  "
+            f"a~EN={res['l1_a_english']:.3f}  b~EN={res['l1_b_english']:.3f}"
+        )
+        print(f"verdict: shared_construction={v['shared_construction']} ({v['confidence']})")
+        for line in v["evidence"]:
+            print(f"  - {line}")
+    return 0
+
+
+def _cmd_nonprose(args) -> int:
+    from .nonprose import nonprose_flag
+
+    flag = nonprose_flag(_resolve_text(args))
+    if args.json or getattr(args, "compact", False):
+        indent = None if getattr(args, "compact", False) else 2
+        print(json.dumps(flag, ensure_ascii=False, indent=indent))
+    else:
+        print(
+            f"nonprose: route={flag['route_score']:.2f}  prose={flag['prose_score']:.2f}  "
+            f"delta={flag['delta']:+.2f}  ->  {flag['verdict']}"
+        )
+    return 0
+
+
 def _cmd_joint(args) -> int:
     from . import joint
 
@@ -478,8 +772,9 @@ def _cmd_anagram(args) -> int:
     text = _resolve_text(args)
     r = anagram.solve(text, widths=range(args.min_width, args.max_width + 1))
     if args.json:
-        print(json.dumps(r, ensure_ascii=False,
-                         indent=None if getattr(args, "compact", False) else 2))
+        print(
+            json.dumps(r, ensure_ascii=False, indent=None if getattr(args, "compact", False) else 2)
+        )
         return 0
     print(f"[transposition w{r.get('width')}] score={r.get('score'):g} order={r.get('order')}")
     print(r.get("plaintext", ""))
@@ -500,18 +795,24 @@ def _cmd_quagmire(args) -> int:
     # (Beaufort isn't an annealing kind; routing it here is also the crash fix).
     if getattr(args, "alphabet", None) or args.kind == "beaufort":
         r = quagmire_solver.solve_fixed_alphabet(
-            text, args.alphabet or quagmire_solver.KRYPTOS_ALPHABET, kind=args.kind,
+            text,
+            args.alphabet or quagmire_solver.KRYPTOS_ALPHABET,
+            kind=args.kind,
             periods=range(args.min_period, args.max_period + 1),
             ct_alphabet=getattr(args, "ct_alphabet", None),
         )
     else:
         r = quagmire_solver.solve(
-            text, periods=range(args.min_period, args.max_period + 1),
-            kind=args.kind, restarts=args.restarts, seed=args.seed,
+            text,
+            periods=range(args.min_period, args.max_period + 1),
+            kind=args.kind,
+            restarts=args.restarts,
+            seed=args.seed,
         )
     if args.json:
-        print(json.dumps(r, ensure_ascii=False,
-                         indent=None if getattr(args, "compact", False) else 2))
+        print(
+            json.dumps(r, ensure_ascii=False, indent=None if getattr(args, "compact", False) else 2)
+        )
         return 0
     print(f"[{args.kind} period {r.get('period')}] fitness={r.get('score'):g}{_recovered_flag(r)}")
     print(r.get("plaintext", ""))
@@ -524,8 +825,9 @@ def _cmd_homophonic(args) -> int:
     text = _resolve_text(args)
     r = homophonic.solve(text, restarts=args.restarts, iters=args.iters)
     if args.json:
-        print(json.dumps(r, ensure_ascii=False,
-                         indent=None if getattr(args, "compact", False) else 2))
+        print(
+            json.dumps(r, ensure_ascii=False, indent=None if getattr(args, "compact", False) else 2)
+        )
         return 0
     print(f"[substitution] fitness={r.get('score'):g}{_recovered_flag(r)}")
     print(r.get("plaintext", ""))
@@ -639,7 +941,10 @@ def _cmd_diagnose(args) -> int:
     if blk.get("best_block"):
         bb = blk["best_block"]
         al = (blk.get("alignment") or {}).get(bb) or {}
-        print(f"block alignment: best_block={bb} residue={al.get('residue')} p={al.get('p')} — try --unit {bb}")
+        print(
+            f"block alignment: best_block={bb} residue={al.get('residue')} p={al.get('p')} "
+            f"— try --unit {bb}"
+        )
     decay = sig.get("ioc_decay") or {}
     if decay:
         print(f"IoC decay: quarters {decay.get('quarter_ioc')} slope_z={decay.get('slope_z')}")
@@ -708,10 +1013,17 @@ def _cmd_keyword(args) -> int:
                 wl = [ln.strip() for ln in fh if ln.strip()]
             words = keyfinder.keyword_from_order(order, wl)
         if args.json:
-            print(json.dumps({
-                "ok": bool(words or gens), "operation": "keyword", "order": order,
-                "keywords": words, "generators": gens,
-            }))
+            print(
+                json.dumps(
+                    {
+                        "ok": bool(words or gens),
+                        "operation": "keyword",
+                        "order": order,
+                        "keywords": words,
+                        "generators": gens,
+                    }
+                )
+            )
         else:
             print(f"keywords: {' '.join(words) or '(none in wordlist)'}")
             print(f"generators: {' '.join(gens) or '(no known generator)'}")
@@ -760,10 +1072,7 @@ def _cmd_relation(args) -> int:
     else:
         print(f"n={info['n']}  groups={info.get('groups')}  floor={info.get('floor')}")
         for c in info["candidates"]:
-            print(
-                f"  {c['alphabet']:>7} coef={c['coef']}  IoC={c['ioc']}  "
-                f"z={c['z']}  p={c['p']}"
-            )
+            print(f"  {c['alphabet']:>7} coef={c['coef']}  IoC={c['ioc']}  z={c['z']}  p={c['p']}")
         print(info["verdict"])
         best = info["candidates"][0] if info["candidates"] else None
         if best and "relation found" in info["verdict"]:
@@ -808,6 +1117,7 @@ def _cmd_subfrac(args) -> int:
     from . import sub_fractionation as sf
 
     text = _resolve_text(args)
+    squares: str | list[str]
     if not args.squares or args.squares == "dictionary":
         squares = "dictionary"
     else:
@@ -866,14 +1176,24 @@ def _cmd_subplayfair(args) -> int:
     from . import sub_playfair as sp
 
     langs = tuple(a.strip() for a in args.langs.split(",") if a.strip()) or ("english",)
-    shapes = [tuple(int(x) for x in s.lower().split("x")) for s in args.shape.split(",") if s.strip()]
+    shapes = [
+        tuple(int(x) for x in s.lower().split("x")) for s in args.shape.split(",") if s.strip()
+    ]
     results = sp.crack_sub_over_playfair(
-        _resolve_text(args), outer_alphabet=args.alphabet, outer_period=args.outer_period,
-        squares=_parse_squares(args.squares), shapes=shapes, objective=args.objective,
-        drop_letter=args.drop_letter, languages=langs, top=args.top, timeout=args.timeout,
+        _resolve_text(args),
+        outer_alphabet=args.alphabet,
+        outer_period=args.outer_period,
+        squares=_parse_squares(args.squares),
+        shapes=shapes,
+        objective=args.objective,
+        drop_letter=args.drop_letter,
+        languages=langs,
+        top=args.top,
+        timeout=args.timeout,
     )
-    rows = [{"square": s, "key": k, "plaintext": p, "score": round(sc, 3)}
-            for (s, k, p, sc) in results]
+    rows = [
+        {"square": s, "key": k, "plaintext": p, "score": round(sc, 3)} for (s, k, p, sc) in results
+    ]
     return _print_cracker_results(rows, args)
 
 
@@ -882,13 +1202,20 @@ def _cmd_subserpf(args) -> int:
 
     langs = tuple(a.strip() for a in args.langs.split(",") if a.strip()) or ("english",)
     results = ss.crack_sub_over_seriated_playfair(
-        _resolve_text(args), outer_alphabet=args.alphabet, inner_period=args.inner_period,
-        outer_period=args.outer_period, squares=_parse_squares(args.squares),
-        objective=args.objective, drop_letter=args.drop_letter, languages=langs,
-        top=args.top, timeout=args.timeout,
+        _resolve_text(args),
+        outer_alphabet=args.alphabet,
+        inner_period=args.inner_period,
+        outer_period=args.outer_period,
+        squares=_parse_squares(args.squares),
+        objective=args.objective,
+        drop_letter=args.drop_letter,
+        languages=langs,
+        top=args.top,
+        timeout=args.timeout,
     )
-    rows = [{"square": s, "key": k, "plaintext": p, "score": round(sc, 3)}
-            for (s, k, p, sc) in results]
+    rows = [
+        {"square": s, "key": k, "plaintext": p, "score": round(sc, 3)} for (s, k, p, sc) in results
+    ]
     return _print_cracker_results(rows, args)
 
 
@@ -898,12 +1225,21 @@ def _cmd_subfoursq(args) -> int:
     langs = tuple(a.strip() for a in args.langs.split(",") if a.strip()) or ("english",)
     bl = _parse_squares(args.bl_squares) if args.bl_squares else None
     results = f4.crack_sub_over_four_square(
-        _resolve_text(args), outer_alphabet=args.alphabet, outer_period=args.outer_period,
-        tr_squares=_parse_squares(args.squares), bl_squares=bl, objective=args.objective,
-        drop_letter=args.drop_letter, languages=langs, top=args.top, timeout=args.timeout,
+        _resolve_text(args),
+        outer_alphabet=args.alphabet,
+        outer_period=args.outer_period,
+        tr_squares=_parse_squares(args.squares),
+        bl_squares=bl,
+        objective=args.objective,
+        drop_letter=args.drop_letter,
+        languages=langs,
+        top=args.top,
+        timeout=args.timeout,
     )
-    rows = [{"tr_square": tg, "bl_square": bg, "key": k, "plaintext": p, "score": round(sc, 3)}
-            for (tg, bg, k, p, sc) in results]
+    rows = [
+        {"tr_square": tg, "bl_square": bg, "key": k, "plaintext": p, "score": round(sc, 3)}
+        for (tg, bg, k, p, sc) in results
+    ]
     return _print_cracker_results(rows, args)
 
 
@@ -914,14 +1250,29 @@ def _cmd_subtwosq(args) -> int:
     bot = _parse_squares(args.bot_squares) if args.bot_squares else None
     layouts = {"vertical": (True,), "horizontal": (False,), "both": (True, False)}[args.layout]
     results = t2.crack_sub_over_two_square(
-        _resolve_text(args), outer_alphabet=args.alphabet, outer_period=args.outer_period,
-        top_squares=_parse_squares(args.squares), bot_squares=bot, layouts=layouts,
-        objective=args.objective, drop_letter=args.drop_letter, languages=langs,
-        top=args.top, timeout=args.timeout,
+        _resolve_text(args),
+        outer_alphabet=args.alphabet,
+        outer_period=args.outer_period,
+        top_squares=_parse_squares(args.squares),
+        bot_squares=bot,
+        layouts=layouts,
+        objective=args.objective,
+        drop_letter=args.drop_letter,
+        languages=langs,
+        top=args.top,
+        timeout=args.timeout,
     )
-    rows = [{"top_square": tg, "bot_square": bg, "layout": "V" if v else "H",
-             "key": k, "plaintext": p, "score": round(sc, 3)}
-            for (tg, bg, v, k, p, sc) in results]
+    rows = [
+        {
+            "top_square": tg,
+            "bot_square": bg,
+            "layout": "V" if v else "H",
+            "key": k,
+            "plaintext": p,
+            "score": round(sc, 3),
+        }
+        for (tg, bg, v, k, p, sc) in results
+    ]
     return _print_cracker_results(rows, args)
 
 
@@ -937,6 +1288,13 @@ def _cmd_stats(args) -> int:
                 "small_sample": bool(flag),
             }
             for p, (m, n, z, flag) in cipher_id.period_significance(text).items()
+        }
+    if getattr(args, "family", False):
+        info["period_family"] = {
+            stat: analysis.period_family_significance(
+                text, statistic=stat, samples=getattr(args, "family_samples", 200)
+            )
+            for stat in ("coset_ioc", "kappa")
         }
     if args.json:
         indent = None if getattr(args, "compact", False) else 2
@@ -955,14 +1313,23 @@ def _cmd_stats(args) -> int:
         if info["likely_periods"]:
             periods = "  ".join(f"{p['period']}(w{p['weight']})" for p in info["likely_periods"])
             print(f"likely periods: {periods}")
+        for stat, r in (info.get("period_family") or {}).items():
+            if r.get("best_period"):
+                verdict = (
+                    "SIGNIFICANT" if r["family_p"] < 0.05 else "not significant (multiplicity)"
+                )
+                print(
+                    f"family[{stat}]: best period {r['best_period']} z={r['z']} "
+                    f"family_p={r['family_p']} — {verdict}"
+                )
         decay = info.get("ioc_decay") or {}
         if decay:
-            flag = " — NON-STATIONARY keystream (period unrecoverable)" if decay.get(
-                "non_stationary"
-            ) else ""
-            print(
-                f"IoC drift: quarters {decay['quarter_ioc']} slope_z={decay['slope_z']}{flag}"
+            flag = (
+                " — NON-STATIONARY keystream (period unrecoverable)"
+                if decay.get("non_stationary")
+                else ""
             )
+            print(f"IoC drift: quarters {decay['quarter_ioc']} slope_z={decay['slope_z']}{flag}")
         kappa = info.get("kappa_spectrum") or []
         strong = [f"{k['lag']}(z{k['z']})" for k in kappa[:5] if k["z"] >= 3]
         if strong:
@@ -973,7 +1340,8 @@ def _cmd_stats(args) -> int:
             al = (blk.get("alignment") or {}).get(bb) or {}
             print(
                 f"block alignment: repeated {blk.get('ngram')}-grams all at residue "
-                f"{al.get('residue')} (mod {bb}), p={al.get('p')} — block-of-{bb} transposition; try --unit {bb}"
+                f"{al.get('residue')} (mod {bb}), p={al.get('p')} — block-of-{bb} transposition; "
+                f"try --unit {bb}"
             )
         cliff = info.get("crackability_cliff") or {}
         if cliff.get("verdict"):
@@ -1321,7 +1689,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--alphabet", default="KRYPTOS", help="keyed-alphabet keyword for the inner substitution"
     )
     p.add_argument(
-        "--layers", type=int, default=1, choices=(1, 2),
+        "--layers",
+        type=int,
+        default=1,
+        choices=(1, 2),
         help="1 = single columnar (keyword sweep); 2 = double columnar (blind SA, best-effort)",
     )
     p.add_argument("--min-width", type=int, default=7, help="min columnar width to search")
@@ -1330,40 +1701,48 @@ def build_parser() -> argparse.ArgumentParser:
         "--wordlist", help="keyword file (one per line) for the order sweep / keyword-pairs"
     )
     p.add_argument(
-        "--keyword-pairs", action="store_true",
+        "--keyword-pairs",
+        action="store_true",
         help="directed double-columnar keyword-PAIR sweep (needs --wordlist)",
     )
     p.add_argument(
-        "--lengths", default="9",
+        "--lengths",
+        default="9",
         help="comma-separated keyword widths for --keyword-pairs (e.g. 8,9,16,17)",
     )
     p.add_argument("--restarts", type=int, default=200, help="SA restarts for double columnar")
     p.add_argument("--seed", type=int, help="RNG seed for reproducible search")
     p.add_argument("--lang", choices=LANGUAGES, default="english", help="scoring language")
     p.add_argument(
-        "--unit", type=int, default=1,
+        "--unit",
+        type=int,
+        default=1,
         help="transposition granularity: 1 = letters; 3 = trigraph (3-letter) blocks "
-             "(keeps trigrams intact — block-transposition geometry). layers=1 only.",
+        "(keeps trigrams intact — block-transposition geometry). layers=1 only.",
     )
     p.add_argument(
-        "--enum", action="store_true",
+        "--enum",
+        action="store_true",
         help="fully enumerate every read-order (non-dictionary orders too) for widths "
-             "min..max, ranked by the mapping-independent reveal-IoC + search-aware null "
-             "(honours --unit). Finds numeric/random columnar keys a keyword sweep misses.",
+        "min..max, ranked by the mapping-independent reveal-IoC + search-aware null "
+        "(honours --unit). Finds numeric/random columnar keys a keyword sweep misses.",
     )
     p.add_argument(
-        "--spectrum", action="store_true",
+        "--spectrum",
+        action="store_true",
         help="diagnostic: per-(width,unit) best reveal-IoC + beats-null verdict — is a periodic "
-             "substitution hidden UNDER a (block) transposition, and at what width/granularity?",
+        "substitution hidden UNDER a (block) transposition, and at what width/granularity?",
     )
     p.add_argument(
-        "--orders", metavar="SPEC",
+        "--orders",
+        metavar="SPEC",
         help="CONFIRM-OR-DIE order decider: score specific candidate read-orders (recognition "
-             "hypotheses) by solving the inner sub under each, vs a shuffle null. SPEC is "
-             "';'-separated orders ('0,2,1,3;3,1,0,2'), @file (one per line), or '-' for stdin.",
+        "hypotheses) by solving the inner sub under each, vs a shuffle null. SPEC is "
+        "';'-separated orders ('0,2,1,3;3,1,0,2'), @file (one per line), or '-' for stdin.",
     )
     p.add_argument(
-        "--periods", default="6-45",
+        "--periods",
+        default="6-45",
         help="inner-substitution period range for --orders/--spectrum, 'lo-hi' (default 6-45).",
     )
     p.set_defaults(func=_cmd_transsub)
@@ -1375,27 +1754,37 @@ def build_parser() -> argparse.ArgumentParser:
     )
     add_io(p)
     p.add_argument(
-        "--keytext", action="append", metavar="TEXT",
+        "--keytext",
+        action="append",
+        metavar="TEXT",
         help="a candidate running key-text, e.g. a sibling puzzle's plaintext (repeatable)",
     )
     p.add_argument(
-        "--keytext-file", action="append", metavar="PATH",
+        "--keytext-file",
+        action="append",
+        metavar="PATH",
         help="file of key-texts: blank-line-separated paragraphs, else one per line (repeatable)",
     )
     p.add_argument(
-        "--alphabets", default="KRYPTOS,STD",
+        "--alphabets",
+        default="KRYPTOS,STD",
         help="comma-separated keyed-alphabet keywords to try (default KRYPTOS,STD)",
     )
     p.add_argument(
-        "--conventions", default="vigenere,beaufort,variant",
+        "--conventions",
+        default="vigenere,beaufort,variant",
         help="comma-separated substitution families to try",
     )
     p.add_argument(
-        "--max-width", type=int, default=8,
+        "--max-width",
+        type=int,
+        default=8,
         help="max columnar width for the peel (<=8 exhaustive; wider via anagram SA)",
     )
     p.add_argument(
-        "--ioc-floor", type=float, default=0.058,
+        "--ioc-floor",
+        type=float,
+        default=0.058,
         help="de-sub IoC above which a winner is treated as transposed-English",
     )
     p.add_argument("--no-peel", action="store_true", help="screen only; don't peel the columnar")
@@ -1403,26 +1792,156 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--lang", choices=LANGUAGES, default="english", help="scoring language")
     p.set_defaults(func=_cmd_runkey)
 
+    # keysource — derive candidate keys from prior-solution texts; compose/decompose word-pair keys
+    p = sub.add_parser(
+        "keysource",
+        help="derive candidate keys from prior-solution texts (running key / acrostic / word), "
+        "compose/decompose two-word keys; give a target ciphertext to screen the running keys",
+    )
+    add_io(p)
+    p.add_argument(
+        "--corpus", action="append", metavar="TEXT", help="a prior-solution text (repeatable)"
+    )
+    p.add_argument(
+        "--corpus-file",
+        action="append",
+        metavar="PATH",
+        help="file of prior-solution text (repeatable)",
+    )
+    p.add_argument(
+        "--compose",
+        nargs=2,
+        metavar=("WORD_A", "WORD_B"),
+        help="build a composed word-pair key (period = lcm of the two lengths)",
+    )
+    p.add_argument(
+        "--decompose", metavar="KEY", help="recover the word pair that composes KEY (needs --words)"
+    )
+    p.add_argument("--words", metavar="CSV|@FILE", help="candidate vocabulary for --decompose")
+    p.add_argument("--alphabet", default="KRYPTOS", help="keyed alphabet for compose/decompose")
+    p.add_argument("--convention", default="vigenere", choices=("vigenere", "beaufort", "variant"))
+    p.add_argument("--min-word", type=int, default=3, help="min length for a word-key candidate")
+    p.add_argument(
+        "--windows",
+        type=int,
+        nargs="*",
+        help="also emit every substring of these lengths (crib-drag territory)",
+    )
+    p.add_argument(
+        "--top", type=int, default=40, help="max candidates to list / ranked screen trials to show"
+    )
+    p.add_argument(
+        "--lang",
+        choices=LANGUAGES,
+        default="english",
+        help="scoring language when screening against a target ciphertext",
+    )
+    p.set_defaults(func=_cmd_keysource)
+
+    # validate — build a same-shape synthetic to prove an attack before trusting a negative
+    p = sub.add_parser(
+        "validate",
+        help="build a same-structure synthetic ciphertext (validate-on-synthetic discipline); "
+        "--self-check runs `butt auto` on it and reports whether it recovers",
+    )
+    p.add_argument(
+        "--structure",
+        required=True,
+        choices=(
+            "substitution",
+            "columnar",
+            "double-columnar",
+            "substitution-over-columnar",
+            "columnar-over-substitution",
+        ),
+        help="construction family to synthesise",
+    )
+    p.add_argument("--sub-key", help="substitution key (period = its length)")
+    p.add_argument(
+        "--substitution",
+        default="vigenere",
+        choices=("vigenere", "beaufort", "variant", "quagmire3"),
+    )
+    p.add_argument("--alphabet", default="KRYPTOS", help="keyed alphabet for the substitution")
+    p.add_argument("--columnar-keyword", help="columnar read-order keyword")
+    p.add_argument("--columnar-keywords", help="two keywords (comma list) for double-columnar")
+    p.add_argument("--length", type=int, help="synthetic length (default: built-in filler length)")
+    p.add_argument("--plaintext", help="use this plaintext instead of the built-in English filler")
+    p.add_argument(
+        "--self-check",
+        action="store_true",
+        help="run `butt auto` on the synthetic and judge recovery",
+    )
+    p.add_argument("--timeout", type=float, default=5.0, help="per-cipher budget for --self-check")
+    add_io(p, with_text=False)
+    p.set_defaults(func=_cmd_validate)
+
+    # hillkpa — Hill known-plaintext (crib) attack: recover the matrix from a little known plaintext
+    p = sub.add_parser(
+        "hillkpa",
+        help="Hill known-plaintext attack: slide a crib, recover the n x n key over a keyed "
+        "alphabet (CRT over Z26), decrypt and rank",
+    )
+    add_io(p)
+    p.add_argument("--crib", required=True, help="known/probable plaintext (>= n full blocks)")
+    p.add_argument("--size", "-n", type=int, default=3, help="Hill block size n (default 3)")
+    p.add_argument(
+        "--alphabet", default="STD", help="index alphabet: STD, KRYPTOS, or a 26-letter permutation"
+    )
+    p.add_argument("--top", type=int, default=10, help="max ranked keys to report")
+    p.set_defaults(func=_cmd_hillkpa)
+
+    # compare — sibling-pair analysis: do two ciphertexts plausibly share a construction?
+    p = sub.add_parser(
+        "compare",
+        help="compare two ciphertexts for a shared construction (freq-profile distance, "
+        "period/kappa signature, additive-translate superimposition) — for chained series",
+    )
+    add_io(p)
+    p.add_argument(
+        "--with", dest="with_text", metavar="TEXT", help="the second ciphertext (or --with-file)"
+    )
+    p.add_argument("--with-file", metavar="PATH", help="read the second ciphertext from a file")
+    p.add_argument("--max-period", type=int, default=16, help="max period for the kappa signature")
+    p.set_defaults(func=_cmd_compare)
+
+    # nonprose — flag a candidate that scores like English but reads as route/structured text
+    p = sub.add_parser(
+        "nonprose",
+        help="score text under a route/instruction model vs a prose model; flags a "
+        "structured (directions/coordinates/list) payload an English scorer would miss",
+    )
+    add_io(p)
+    p.set_defaults(func=_cmd_nonprose)
+
     # joint — dual nested simulated-annealing climber over transposition + substitution,
     # scored on the FINAL plaintext (entropy-normalized hexagrams). AZdecrypt-style.
     p = sub.add_parser(
         "joint",
-        help="joint transposition+substitution dual-SA climber (entropy-normalized hexagram fitness)",
+        help=(
+            "joint transposition+substitution dual-SA climber (entropy-normalized hexagram fitness)"
+        ),
     )
     add_io(p)
     p.add_argument(
-        "--layer", choices=("inner", "outer"), default="inner",
+        "--layer",
+        choices=("inner", "outer"),
+        default="inner",
         help="inner = transposition OUTER / sub INNER; outer = sub OUTER",
     )
     p.add_argument("--min-width", type=int, default=8, help="min columnar width to search")
     p.add_argument("--max-width", type=int, default=17, help="max columnar width to search")
     p.add_argument("--min-period", type=int, default=9, help="min substitution period")
     p.add_argument("--max-period", type=int, default=16, help="max substitution period")
-    p.add_argument("--alphabets", default="KRYPTOS,STD", help="comma-separated keyed-alphabet keywords")
+    p.add_argument(
+        "--alphabets", default="KRYPTOS,STD", help="comma-separated keyed-alphabet keywords"
+    )
     p.add_argument("--variant", choices=("vig", "beaufort", "both"), default="both")
     p.add_argument("--restarts", type=int, default=20, help="annealing restarts per config")
     p.add_argument("--iters", type=int, default=4000, help="annealing iterations per restart")
-    p.add_argument("--ngram", default="hexagrams", help="fitness n-gram model (hexagrams/quintgrams/quadgrams)")
+    p.add_argument(
+        "--ngram", default="hexagrams", help="fitness n-gram model (hexagrams/quintgrams/quadgrams)"
+    )
     p.add_argument("--seed", type=int, help="RNG seed")
     p.add_argument("--top", type=int, default=5, help="number of top results to report")
     p.set_defaults(func=_cmd_joint)
@@ -1444,7 +1963,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     add_io(p)
     p.add_argument(
-        "--kind", default="quagmire3",
+        "--kind",
+        default="quagmire3",
         choices=("vigenere", "beaufort", "quagmire1", "quagmire2", "quagmire3", "quagmire4"),
         help="cipher variant to solve",
     )
@@ -1455,7 +1975,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--alphabet",
         help="known keyed alphabet or keyword (e.g. KRYPTOS): fast fixed-alphabet "
-             "solve that recovers only the shifts, skipping the alphabet annealing",
+        "solve that recovers only the shifts, skipping the alphabet annealing",
     )
     p.add_argument("--ct-alphabet", help="second keyed alphabet for Quagmire IV (with --alphabet)")
     p.set_defaults(func=_cmd_quagmire)
@@ -1522,7 +2042,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("--autokey", action="store_true", help="plaintext-autokey crib-unzip")
     p.add_argument(
-        "--product", action="store_true",
+        "--product",
+        action="store_true",
         help="two-coprime-keystream product crib solver (union-find)",
     )
     p.add_argument("--pos", type=int, help="known crib position (product exact solve)")
@@ -1532,13 +2053,18 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--q-range", type=int, nargs=2, metavar=("LO", "HI"), help="product q range")
     p.add_argument("--alphabet", default="KRYPTOS", help="keyed alphabet for keyed/product")
     p.add_argument(
-        "--inner-columnar", action="store_true",
+        "--inner-columnar",
+        action="store_true",
         help="crib-anchor a periodic substitution UNDER a columnar transposition: jointly "
-             "recover the column read-order AND the period-p Quagmire key by consistency "
-             "backtracking (the --crib is the plaintext PREFIX). Sidesteps the flat blind objective.",
+        "recover the column read-order AND the period-p Quagmire key by consistency "
+        "backtracking (the --crib is the plaintext PREFIX). Sidesteps the flat blind objective.",
     )
-    p.add_argument("--widths", type=int, nargs="+", help="columnar widths to try (must divide length)")
-    p.add_argument("--periods", type=int, nargs=2, metavar=("LO", "HI"), help="inner-sub period range")
+    p.add_argument(
+        "--widths", type=int, nargs="+", help="columnar widths to try (must divide length)"
+    )
+    p.add_argument(
+        "--periods", type=int, nargs=2, metavar=("LO", "HI"), help="inner-sub period range"
+    )
     p.set_defaults(func=_cmd_crib)
 
     # identify
@@ -1559,9 +2085,10 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("keyword", help="recover the keyword from a keyed alphabet or square")
     p.add_argument("--size", type=int, help="square size (5 or 6) to force square mode")
     p.add_argument(
-        "--order", metavar="SPEC",
+        "--order",
+        metavar="SPEC",
         help="invert a columnar READ-ORDER ('0,2,1,3') back to its keyword (with --wordlist) "
-             "and/or a named generator (reverse, rotate-k, riffle, ...).",
+        "and/or a named generator (reverse, rotate-k, riffle, ...).",
     )
     p.add_argument("--wordlist", help="candidate keywords for --order inversion")
     add_io(p)
@@ -1576,8 +2103,23 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("stats", help="frequency / IoC / digraph / Kasiski analysis")
     p.add_argument("--contacts", action="store_true", help="add variety-of-contacts (vowel finder)")
     p.add_argument(
-        "--significance", action="store_true",
-        help="length-aware coset-period significance (z vs matched null; flags small-sample periods)",
+        "--significance",
+        action="store_true",
+        help=(
+            "length-aware coset-period significance (z vs matched null; flags small-sample periods)"
+        ),
+    )
+    p.add_argument(
+        "--family",
+        action="store_true",
+        help="look-elsewhere-corrected significance of the strongest period (max-z over the whole "
+        "period grid vs shuffles) — a per-period z that doesn't clear it is multiplicity noise",
+    )
+    p.add_argument(
+        "--family-samples",
+        type=int,
+        default=200,
+        help="shuffles for the --family null (default 200)",
     )
     add_io(p)
     p.set_defaults(func=_cmd_stats)
@@ -1606,7 +2148,10 @@ def build_parser() -> argparse.ArgumentParser:
         "where a wide-block search is not exhaustive, so a null is never mis-read as 'not Hill')",
     )
     p.add_argument(
-        "--widths", type=int, nargs="+", default=[2, 3],
+        "--widths",
+        type=int,
+        nargs="+",
+        default=[2, 3],
         help="block widths to probe (default 2 3). A w-tap probe is BLIND to a wider Hill.",
     )
     p.add_argument("--alphabet", default="KRYPTOS", help="keyed alphabet for the index space")
@@ -1625,23 +2170,34 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--alphabet", default="KRYPTOS", help="outer substitution keyed alphabet")
     p.add_argument("--inner-period", type=int, default=7, help="inner bifid seriation period")
     p.add_argument(
-        "--outer-period", type=int, default=None, help="outer substitution key period (default=inner)"
+        "--outer-period",
+        type=int,
+        default=None,
+        help="outer substitution key period (default=inner)",
     )
     p.add_argument(
-        "--squares", default="dictionary",
+        "--squares",
+        default="dictionary",
         help="'dictionary' (full wordlist scan) or a comma-separated list of square keywords",
     )
     p.add_argument(
-        "--objective", default="fitness", choices=("fitness", "ioc", "repeats"),
-        help="key-recovery objective: fitness=quadgram (prose), ioc/repeats=payload-agnostic (route)",
+        "--objective",
+        default="fitness",
+        choices=("fitness", "ioc", "repeats"),
+        help=(
+            "key-recovery objective: fitness=quadgram (prose), ioc/repeats=payload-agnostic (route)"
+        ),
     )
     p.add_argument(
-        "--drop-letter", default=None,
+        "--drop-letter",
+        default=None,
         help="omitted square letter (default J); a letter, comma-list, or 'sweep' for all 26",
     )
     p.add_argument("--langs", default="english", help="comma-separated scoring languages")
     p.add_argument("--top", type=int, default=5, help="candidates to report")
-    p.add_argument("--timeout", type=float, default=None, help="seconds budget for a dictionary scan")
+    p.add_argument(
+        "--timeout", type=float, default=None, help="seconds budget for a dictionary scan"
+    )
     add_io(p)
     p.set_defaults(func=_cmd_subfrac)
 
@@ -1650,11 +2206,14 @@ def build_parser() -> argparse.ArgumentParser:
         pp.add_argument("--alphabet", default="KRYPTOS", help="outer substitution keyed alphabet")
         pp.add_argument("--outer-period", type=int, default=7, help="outer substitution key period")
         pp.add_argument(
-            "--squares", default="dictionary",
+            "--squares",
+            default="dictionary",
             help="'dictionary' or a comma-separated list of square keywords",
         )
         pp.add_argument(
-            "--objective", default="fitness", choices=("fitness", "ioc", "repeats"),
+            "--objective",
+            default="fitness",
+            choices=("fitness", "ioc", "repeats"),
             help="key-recovery objective (fitness=prose; ioc/repeats=payload-agnostic)",
         )
         pp.add_argument("--drop-letter", default=None, help=drop_help)
@@ -1668,9 +2227,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="crack a periodic substitution OVER a Playfair inner by scanning the square and "
         "recovering the outer key for free (drop-letter-pruned descent).",
     )
-    _add_common_sub(p, drop_help="omitted square letter (default J); a letter, comma-list, or 'sweep'")
+    _add_common_sub(
+        p, drop_help="omitted square letter (default J); a letter, comma-list, or 'sweep'"
+    )
     p.add_argument(
-        "--shape", default="5x5",
+        "--shape",
+        default="5x5",
         help="inner grid shape(s), comma-separated RxC (default 5x5). 26-cell shapes like 2x13 "
         "keep all 26 letters (no drop). E.g. '2x13,13x2'.",
     )
@@ -1682,7 +2244,9 @@ def build_parser() -> argparse.ArgumentParser:
         "natively period-N).",
     )
     p.add_argument("--inner-period", type=int, default=7, help="inner seriation period")
-    _add_common_sub(p, drop_help="omitted square letter (default J); a letter, comma-list, or 'sweep'")
+    _add_common_sub(
+        p, drop_help="omitted square letter (default J); a letter, comma-list, or 'sweep'"
+    )
     p.set_defaults(func=_cmd_subserpf)
 
     p = sub.add_parser(
@@ -1690,8 +2254,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="crack a periodic substitution OVER a Four-square inner (a PAIR of keyed squares — "
         "the paired-thematic-word signature).",
     )
-    p.add_argument("--bl-squares", default=None, help="bottom-left square list (default: reuse --squares)")
-    _add_common_sub(p, drop_help="omitted square letter (default Q, four-square convention); or 'sweep'")
+    p.add_argument(
+        "--bl-squares", default=None, help="bottom-left square list (default: reuse --squares)"
+    )
+    _add_common_sub(
+        p, drop_help="omitted square letter (default Q, four-square convention); or 'sweep'"
+    )
     p.set_defaults(func=_cmd_subfoursq)
 
     p = sub.add_parser(
@@ -1699,12 +2267,18 @@ def build_parser() -> argparse.ArgumentParser:
         help="crack a periodic substitution OVER a Two-square (double Playfair) inner (a pair of "
         "keyed squares, vertical/horizontal).",
     )
-    p.add_argument("--bot-squares", default=None, help="bottom/right square list (default: reuse --squares)")
     p.add_argument(
-        "--layout", default="both", choices=("vertical", "horizontal", "both"),
+        "--bot-squares", default=None, help="bottom/right square list (default: reuse --squares)"
+    )
+    p.add_argument(
+        "--layout",
+        default="both",
+        choices=("vertical", "horizontal", "both"),
         help="two-square layout to try",
     )
-    _add_common_sub(p, drop_help="omitted square letter (default Q, two-square convention); or 'sweep'")
+    _add_common_sub(
+        p, drop_help="omitted square letter (default Q, two-square convention); or 'sweep'"
+    )
     p.set_defaults(func=_cmd_subtwosq)
 
     # convert

@@ -36,12 +36,14 @@ Public API:
 Falls back to CPU (pure-torch on device='cpu') when CUDA is unavailable; the algorithm
 is identical, just slower.
 """
+
 from __future__ import annotations
 
 import itertools
 import math
 import os
 from importlib import resources
+from typing import Any
 
 from buttcrack.ciphers.columnar import _decode_letters, _encode_letters
 from buttcrack.scoring import ENGLISH_MONOGRAM_FREQ, get_scorer
@@ -136,14 +138,18 @@ def _build_tables(torch, dev, alph: str, n: int):
     for line in raw.splitlines():
         p = line.split()
         if len(p) >= 2 and len(p[0]) == 2 and p[0].isalpha():
-            a0, b0 = p[0].upper()
+            pair = p[0].upper()
+            a0, b0 = pair[0], pair[1]
             counts[ord(a0) - 65][ord(b0) - 65] += float(p[1])
     tot = sum(sum(r) for r in counts) or 1.0
     floor = math.log(0.01 / tot)
     bg_raw = torch.tensor(
-        [[math.log(counts[i][j] / tot) if counts[i][j] > 0 else floor for j in range(26)]
-         for i in range(26)],
-        dtype=torch.float32, device=dev,
+        [
+            [math.log(counts[i][j] / tot) if counts[i][j] > 0 else floor for j in range(26)]
+            for i in range(26)
+        ],
+        dtype=torch.float32,
+        device=dev,
     )
     pidx = torch.tensor(perm_raw, device=dev)
     BG = bg_raw[pidx][:, pidx]  # BG[a,b] = log P(alph[a] alph[b])
@@ -163,7 +169,7 @@ def _score_batch(torch, S, sheng_v, sheng_b, BG, cls, ones, n):
         hist.scatter_add_(1, flat, ones[:B])
         hist = hist.view(B, p, 26)
         # vigenere: best shift per class, then de-sub & bigram score
-        bs_v = (hist @ sheng_v.T).argmax(2)                       # [B,p]
+        bs_v = (hist @ sheng_v.T).argmax(2)  # [B,p]
         desub_v = (S - bs_v.gather(1, clsp)) % 26
         sc_v = BG[desub_v[:, :-1], desub_v[:, 1:]].sum(1)
         # beaufort
@@ -202,7 +208,7 @@ def _chi2_best_shift(cl: list[str], aidx: dict, alph: str, variant: str) -> int:
 
 
 def _recover_rotations(stream: str, aidx: dict, alph: str, variant: str, period: int) -> list[int]:
-    cls = [[] for _ in range(period)]
+    cls: list[list[str]] = [[] for _ in range(period)]
     for i, ch in enumerate(stream):
         cls[i % period].append(ch)
     return [_chi2_best_shift(c, aidx, alph, variant) for c in cls]
@@ -210,14 +216,18 @@ def _recover_rotations(stream: str, aidx: dict, alph: str, variant: str, period:
 
 def _finish_stream(stream: str, alphabets=(KRY, STD), periods=PERIODS):
     """chi2 shift recovery + quadgram score over alphabets x {vig,beaufort} x periods."""
-    best = (-1e18, None, None)
+    best: tuple[float, str | None, tuple[str, str, int] | None] = (-1e18, None, None)
     for alph in alphabets:
         aidx = {c: i for i, c in enumerate(alph)}
         for var in ("vig", "beaufort"):
             for p in periods:
                 sh = _recover_rotations(stream, aidx, alph, var, p)
                 pt = "".join(
-                    alph[((aidx[c] - sh[i % p]) % 26) if var == "vig" else ((sh[i % p] - aidx[c]) % 26)]
+                    alph[
+                        ((aidx[c] - sh[i % p]) % 26)
+                        if var == "vig"
+                        else ((sh[i % p] - aidx[c]) % 26)
+                    ]
                     for i, c in enumerate(stream)
                 )
                 s = _QUAD.score(pt)
@@ -229,8 +239,15 @@ def _finish_stream(stream: str, alphabets=(KRY, STD), periods=PERIODS):
 # --------------------------------------------------------------------------- #
 # Public API
 # --------------------------------------------------------------------------- #
-def scan_double_w8(ct, alphabet: str = "KRYPTOS", keep: int = 20000, finish: int = 64,
-                   _validate_plant=None, _progress=False, _only_outer=None):
+def scan_double_w8(
+    ct,
+    alphabet: str = "KRYPTOS",
+    keep: int = 20000,
+    finish: int = 64,
+    _validate_plant=None,
+    _progress=False,
+    _only_outer=None,
+):
     """Scan all 8! x 8! width-8 double columnar transpositions of ``ct``.
 
     Each composed permutation is GPU-scored (bigram of best-shift de-sub, max over
@@ -275,7 +292,11 @@ def scan_double_w8(ct, alphabet: str = "KRYPTOS", keep: int = 20000, finish: int
     arangeI = torch.arange(M, device=dev)
 
     true_o = true_i = None
-    diag = {"true_pair_in_topk": None, "true_pair_global_rank": None, "global_top": None}
+    diag: dict[str, Any] = {
+        "true_pair_in_topk": None,
+        "true_pair_global_rank": None,
+        "global_top": None,
+    }
     if _validate_plant is not None:
         true_o, true_i = _validate_plant
 
@@ -285,7 +306,7 @@ def scan_double_w8(ct, alphabet: str = "KRYPTOS", keep: int = 20000, finish: int
     # validate the discriminator on the true-outer row in seconds instead of the full grid).
     outer_iter = range(M) if _only_outer is None else [int(_only_outer)]
     for o in outer_iter:
-        composed = fac[o][fac]              # [M, n]
+        composed = fac[o][fac]  # [M, n]
         S = ct_idx[composed]
         sc = _score_batch(torch, S, sheng_v, sheng_b, BG, cls, ones, n)
         cat_s = torch.cat([bs_score, sc])
@@ -308,9 +329,11 @@ def scan_double_w8(ct, alphabet: str = "KRYPTOS", keep: int = 20000, finish: int
         diag["global_top"] = bs_score[0].item()
 
     # rank surviving composed perms, CPU-finish the best `finish`.
-    ranked = sorted(zip(bs_score.tolist(), bs_o.tolist(), bs_i.tolist()), reverse=True)
+    ranked = sorted(
+        zip(bs_score.tolist(), bs_o.tolist(), bs_i.tolist(), strict=False), reverse=True
+    )
     results = []
-    for s, o, i in ranked[:finish]:
+    for _s, o, i in ranked[:finish]:
         if o < 0 or i < 0:
             continue
         comp = fac[o][fac[i]].tolist()
@@ -326,15 +349,24 @@ def scan_double_w8(ct, alphabet: str = "KRYPTOS", keep: int = 20000, finish: int
     return results
 
 
-def scan_double_w8_cpu(ct, alphabet: str = "KRYPTOS", keep: int = 20000, finish: int = 64,
-                       _validate_plant=None):
+def scan_double_w8_cpu(
+    ct,
+    alphabet: str = "KRYPTOS",
+    keep: int = 20000,
+    finish: int = 64,
+    _validate_plant=None,
+    _only_outer=None,
+):
     """Force the CPU path (torch on device='cpu'); identical algorithm. Used as the
     fallback when CUDA is unavailable and exercised by the self-test."""
     import torch
+
     real = torch.cuda.is_available
     try:
         torch.cuda.is_available = lambda: False
-        return scan_double_w8(ct, alphabet, keep, finish, _validate_plant=_validate_plant)
+        return scan_double_w8(
+            ct, alphabet, keep, finish, _validate_plant=_validate_plant, _only_outer=_only_outer
+        )
     finally:
         torch.cuda.is_available = real
 
@@ -343,25 +375,27 @@ def scan_double_w8_cpu(ct, alphabet: str = "KRYPTOS", keep: int = 20000, finish:
 # self-test: plant a double-w8 sub-inner synthetic, assert GPU top-K rank + finish
 # --------------------------------------------------------------------------- #
 def _english_sample(n: int) -> str:
-    base = ("OVERTHEQUIETMORNINGTHELIBRARIANSORTEDEACHVOLUMEONTHESHELFANDNOTEDITSTITLEINLEDGER"
-            "WHILESTUDENTSGATHEREDNEARTHEWINDOWSTOREADBENEATHTHEWARMLIGHTOFTHERISINGSUNOUTSIDE"
-            "ABROADRIVERWOUNDPASTTHEOLDSTONEBRIDGEWHEREFARMERSCARRIEDBASKETSOFFRESHFRUITTOTOWN"
-            "ANDCHILDRENPLAYEDALONGTHEGRASSYBANKSLAUGHINGASTHEYCHASEDONEANOTHERTHROUGHTHEFIELDS")
+    base = (
+        "OVERTHEQUIETMORNINGTHELIBRARIANSORTEDEACHVOLUMEONTHESHELFANDNOTEDITSTITLEINLEDGER"
+        "WHILESTUDENTSGATHEREDNEARTHEWINDOWSTOREADBENEATHTHEWARMLIGHTOFTHERISINGSUNOUTSIDE"
+        "ABROADRIVERWOUNDPASTTHEOLDSTONEBRIDGEWHEREFARMERSCARRIEDBASKETSOFFRESHFRUITTOTOWN"
+        "ANDCHILDRENPLAYEDALONGTHEGRASSYBANKSLAUGHINGASTHEYCHASEDONEANOTHERTHROUGHTHEFIELDS"
+    )
     return (base * 3)[:n]
 
 
 def _selftest():
-    import random
     import itertools as _it
+    import random
 
     try:
         import torch  # noqa: F401
-        have_torch = True
     except Exception as e:  # pragma: no cover
         print(f"[selftest] torch import failed ({e}); cannot run.")
         return False
 
     import torch
+
     cuda = torch.cuda.is_available()
     print(f"[selftest] torch={torch.__version__} cuda={cuda}")
 
@@ -383,36 +417,59 @@ def _selftest():
         period = 11
         shifts = [rng.randrange(26) for _ in range(period)]
         Ssub = _sub_encode(pt, shifts, alph, variant)
-        oa = list(range(8)); rng.shuffle(oa)   # inner read-order
-        ob = list(range(8)); rng.shuffle(ob)   # outer read-order
+        oa = list(range(8))
+        rng.shuffle(oa)  # inner read-order
+        ob = list(range(8))
+        rng.shuffle(ob)  # outer read-order
         ct = _encode_letters(_encode_letters(Ssub, oa), ob)
         true_inner = perms.index(oa)
         true_outer = perms.index(ob)
-        print(f"\n[selftest:{variant}] planted period={period} inner={oa} outer={ob} "
-              f"(true_outer={true_outer} true_inner={true_inner})", flush=True)
+        print(
+            f"\n[selftest:{variant}] planted period={period} inner={oa} outer={ob} "
+            f"(true_outer={true_outer} true_inner={true_inner})",
+            flush=True,
+        )
         assert _decode_letters(_decode_letters(ct, ob), oa) == Ssub, "plant/undo mismatch"
 
         if full:
-            print(f"[selftest:{variant}] {label} FULL scan over {40320 * 40320} pairs ...",
-                  flush=True)
-            results, diag = fn(ct, alphabet="KRYPTOS", keep=keep, finish=64,
-                               _validate_plant=(true_outer, true_inner))
+            print(
+                f"[selftest:{variant}] {label} FULL scan over {40320 * 40320} pairs ...", flush=True
+            )
+            results, diag = fn(
+                ct,
+                alphabet="KRYPTOS",
+                keep=keep,
+                finish=64,
+                _validate_plant=(true_outer, true_inner),
+            )
             rank_ok = bool(diag["true_pair_in_topk"])
         else:
             print(f"[selftest:{variant}] {label} ROW validation (true-outer row) ...", flush=True)
-            results, diag = fn(ct, alphabet="KRYPTOS", keep=keep, finish=64,
-                               _validate_plant=(true_outer, true_inner), _only_outer=true_outer)
+            results, diag = fn(
+                ct,
+                alphabet="KRYPTOS",
+                keep=keep,
+                finish=64,
+                _validate_plant=(true_outer, true_inner),
+                _only_outer=true_outer,
+            )
             rank_ok = diag.get("true_pair_row_rank", 99999) <= 1
-        print(f"[selftest:{variant}] true-pair score={diag.get('true_pair_score'):.1f} "
-              f"row-rank={diag.get('true_pair_row_rank')}/40320 "
-              f"global-top={diag.get('global_top'):.1f}", flush=True)
+        print(
+            f"[selftest:{variant}] true-pair score={diag.get('true_pair_score'):.1f} "
+            f"row-rank={diag.get('true_pair_row_rank')}/40320 "
+            f"global-top={diag.get('global_top'):.1f}",
+            flush=True,
+        )
         score, _, _, recovered = results[0]
-        match = sum(a == b for a, b in zip(recovered, pt)) / len(pt)
+        match = sum(a == b for a, b in zip(recovered, pt, strict=False)) / len(pt)
         read_ok = match >= 0.85
         passed = rank_ok and read_ok
-        print(f"[selftest:{variant}] CPU-finish quad={score:.0f} char-match={match:.0%} "
-              f"rank={'PASS' if rank_ok else 'FAIL'} read={'PASS' if read_ok else 'FAIL'} -> "
-              f"{'PASS' if passed else 'FAIL'}", flush=True)
+        print(
+            f"[selftest:{variant}] CPU-finish quad={score:.0f} char-match={match:.0%} "
+            f"rank={'PASS' if rank_ok else 'FAIL'} read={'PASS' if read_ok else 'FAIL'} -> "
+            f"{'PASS' if passed else 'FAIL'}",
+            flush=True,
+        )
         return passed
 
     return all(_trial(v) for v in ("vig", "beaufort"))
@@ -420,6 +477,7 @@ def _selftest():
 
 if __name__ == "__main__":
     import sys
+
     ok = _selftest()
     print("SELFTEST:", "PASS" if ok else "FAIL")
     sys.exit(0 if ok else 1)

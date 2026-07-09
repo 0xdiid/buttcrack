@@ -400,7 +400,9 @@ def compute_features(text: str) -> dict:
     # Length-aware reliability of the reported period: how many letters land in each mod-p coset,
     # and whether that is too few to trust the coset IoC (small-sample artifact). Cheap — no null.
     best_period_letters_per_coset = (n / best_period) if best_period >= 1 else 0.0
-    best_period_small_sample = best_period >= 2 and best_period_letters_per_coset < SMALL_SAMPLE_COSET
+    best_period_small_sample = (
+        best_period >= 2 and best_period_letters_per_coset < SMALL_SAMPLE_COSET
+    )
     max_kappa, kappa_period = _max_kappa(letters) if n >= 2 else (0.0, 1)
     dic = _digraphic_ioc(letters, step=1)
     edi = _digraphic_ioc(letters, step=2)

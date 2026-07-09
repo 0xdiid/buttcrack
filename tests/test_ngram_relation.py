@@ -79,7 +79,9 @@ def test_searchaware_p_is_matched_count_under_a_larger_search():
     # (per-replicate max over the SAME enlarged candidate set) must not.
     rng = random.Random(7)
     rnd = "".join(rng.choice("ABCDEFGHIJKLMNOPQRSTUVWXYZ") for _ in range(360))
-    result = scan(rnd, n=3, coeffs=(-2, -1, 0, 1, 2), alphabets=("KRYPTOS", "STD"), samples=600, seed=1)
+    result = scan(
+        rnd, n=3, coeffs=(-2, -1, 0, 1, 2), alphabets=("KRYPTOS", "STD"), samples=600, seed=1
+    )
     assert "no elevated linear relation" in result["verdict"]
     best = result["candidates"][0]
     # Even the strongest of the many candidates is not significant once the null is matched-count.

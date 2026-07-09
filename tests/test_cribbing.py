@@ -7,8 +7,8 @@ objective. This pins the recovery as a regression (the module previously had no 
 
 import random
 
-from buttcrack.cribbing import KRYPTOS_ALPHABET, _sub_encode, solve
 from buttcrack.ciphers.columnar import _encode_letters
+from buttcrack.cribbing import KRYPTOS_ALPHABET, _sub_encode, solve
 from buttcrack.text import only_letters
 
 BASE = (
@@ -48,6 +48,7 @@ def test_wrong_crib_does_not_reconstruct_english():
     """The crib is anchored, so any solution starts with it — but a WRONG crib cannot
     reconstruct coherent English in the rest of the text (it forces an inconsistent order)."""
     from buttcrack.words import long_word_coverage
+
     _, ct = _make(width=16, period=11, variant="vig", seed=3)
     res = solve(ct, "ZZZZZZZZZZZZ", widths=(16,), periods=range(9, 13))
     assert res is None or long_word_coverage(only_letters(res["plaintext"])) < 0.4

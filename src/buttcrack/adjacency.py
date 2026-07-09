@@ -11,14 +11,14 @@ because column-adjacency is a structural signal independent of the substitution 
 Recovery is bootstrap-limited by letters-per-class (= N / period): ~25 letters/class
 recovers at modest restarts; ~21/class needs far more restarts.
 """
+
 from __future__ import annotations
 
-import os
 import random
 from collections import Counter
 
-from .ciphers.columnar import _encode_letters, _decode_letters
-from .scoring import get_scorer, ENGLISH_MONOGRAM_FREQ
+from .ciphers.columnar import _decode_letters, _encode_letters
+from .scoring import ENGLISH_MONOGRAM_FREQ, get_scorer
 
 KRYPTOS = "KRYPTOSABCDEFGHIJLMNQUVWXZ"
 STANDARD = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -51,7 +51,7 @@ def _best_shift(cl, idx, alph, variant):
         return 0
     best = (0, 1e18)
     for s in range(26):
-        cnt = Counter()
+        cnt: Counter[str] = Counter()
         for ch in cl:
             c = idx[ch]
             j = (c - s) % 26 if variant == "vig" else (s - c) % 26
@@ -63,7 +63,7 @@ def _best_shift(cl, idx, alph, variant):
 
 
 def recover_rotations(stream, idx, alph, variant, period):
-    cls = [[] for _ in range(period)]
+    cls: list[list[str]] = [[] for _ in range(period)]
     for i, ch in enumerate(stream):
         cls[i % period].append(ch)
     return [_best_shift(c, idx, alph, variant) for c in cls]
@@ -75,7 +75,8 @@ def _fitness(ct, order, alph, variant, period, return_pt=False):
     shifts = recover_rotations(S, idx, alph, variant, period)
     out = []
     for i, ch in enumerate(S):
-        c = idx[ch]; s = shifts[i % period]
+        c = idx[ch]
+        s = shifts[i % period]
         j = (c - s) % 26 if variant == "vig" else (s - c) % 26
         out.append(alph[j])
     pt = "".join(out)
@@ -86,7 +87,8 @@ def _fitness(ct, order, alph, variant, period, return_pt=False):
 def _desub_block_at_col(block, c, shifts, idx, alph, variant, width, period):
     out = []
     for r, ch in enumerate(block):
-        cc = idx[ch]; s = shifts[(r * width + c) % period]
+        cc = idx[ch]
+        s = shifts[(r * width + c) % period]
         j = (cc - s) % 26 if variant == "vig" else (s - cc) % 26
         out.append(alph[j])
     return out
@@ -94,18 +96,25 @@ def _desub_block_at_col(block, c, shifts, idx, alph, variant, width, period):
 
 def assemble_order(ct, shifts, alph, variant, width, period, beam=1500):
     """Beam-search the column read-order by column-pair bigram fit (multiple anagramming)."""
-    idx = _ai(alph); h = len(ct) // width
-    blocks = [ct[i * h:(i + 1) * h] for i in range(width)]
-    PTcol = [[_desub_block_at_col(blocks[b], c, shifts, idx, alph, variant, width, period)
-              for c in range(width)] for b in range(width)]
+    idx = _ai(alph)
+    h = len(ct) // width
+    blocks = [ct[i * h : (i + 1) * h] for i in range(width)]
+    PTcol = [
+        [
+            _desub_block_at_col(blocks[b], c, shifts, idx, alph, variant, width, period)
+            for c in range(width)
+        ]
+        for b in range(width)
+    ]
 
     def adj(i, j, c):
-        left = PTcol[i][c]; right = PTcol[j][c + 1]
+        left = PTcol[i][c]
+        right = PTcol[j][c + 1]
         return sum(_BLOG.get(left[r] + right[r], _BFLOOR) for r in range(h))
 
-    states = [(0.0, (b,), 1 << b) for b in range(width)]
+    states: list[tuple[float, tuple[int, ...], int]] = [(0.0, (b,), 1 << b) for b in range(width)]
     for pos in range(1, width):
-        nxt = []
+        nxt: list[tuple[float, tuple[int, ...], int]] = []
         for sc, order, used in states:
             last = order[-1]
             for j in range(width):
@@ -131,34 +140,43 @@ def _polish(ct, order, alph, variant, period, width):
                 order[a], order[b] = order[b], order[a]
                 s2 = _fitness(ct, order, alph, variant, period)
                 if s2 > sc + 1e-9:
-                    sc = s2; improved = True
+                    sc = s2
+                    improved = True
                 else:
                     order[a], order[b] = order[b], order[a]
         for i in range(width):
             for j in range(width):
                 if i == j:
                     continue
-                o = order[:]; col = o.pop(i); o.insert(j, col)
+                o = order[:]
+                col = o.pop(i)
+                o.insert(j, col)
                 s2 = _fitness(ct, o, alph, variant, period)
                 if s2 > sc + 1e-9:
-                    order[:] = o; sc = s2; improved = True
+                    order[:] = o
+                    sc = s2
+                    improved = True
     return sc
 
 
 def _collect_seeds(ct, alph, variant, period, width, rng, restarts, keep, max_passes=3):
     seen: dict[tuple, float] = {}
     for _ in range(restarts):
-        order = list(range(width)); rng.shuffle(order)
+        order = list(range(width))
+        rng.shuffle(order)
         sc = _fitness(ct, order, alph, variant, period)
-        improved = True; passes = 0
+        improved = True
+        passes = 0
         while improved and passes < max_passes:
-            improved = False; passes += 1
+            improved = False
+            passes += 1
             for a in range(width):
                 for b in range(a + 1, width):
                     order[a], order[b] = order[b], order[a]
                     s2 = _fitness(ct, order, alph, variant, period)
                     if s2 > sc + 1e-9:
-                        sc = s2; improved = True
+                        sc = s2
+                        improved = True
                     else:
                         order[a], order[b] = order[b], order[a]
         key = tuple(order)
@@ -168,8 +186,9 @@ def _collect_seeds(ct, alph, variant, period, width, rng, restarts, keep, max_pa
     return [list(k) for k, _ in top]
 
 
-def solve(ct, width, period, alphabet="KRYPTOS", variant="vig",
-          restarts=200, keep=12, beam=1500, seed=0):
+def solve(
+    ct, width, period, alphabet="KRYPTOS", variant="vig", restarts=200, keep=12, beam=1500, seed=0
+):
     """Recover the columnar order + substitution for a sub-INNER complete columnar.
 
     Returns dict(score, plaintext, order, shifts). ``score`` is the quadgram total
@@ -186,7 +205,8 @@ def solve(ct, width, period, alphabet="KRYPTOS", variant="vig",
     best = (-1e18, None, None, None)
     for s0 in seeds:
         shifts = recover_rotations(_decode_letters(ct, s0), idx, alph, variant, period)
-        order = s0; prev = None
+        order = s0
+        prev = None
         for _ in range(4):
             order = assemble_order(ct, shifts, alph, variant, width, period, beam=beam)
             shifts = recover_rotations(_decode_letters(ct, order), idx, alph, variant, period)
@@ -198,8 +218,16 @@ def solve(ct, width, period, alphabet="KRYPTOS", variant="vig",
         if sc > best[0]:
             best = (sc, pt, order[:], sh)
     score, pt, order, shifts = best
-    return {"score": score, "plaintext": pt, "order": order, "shifts": shifts,
-            "width": width, "period": period, "alphabet": alphabet, "variant": variant}
+    return {
+        "score": score,
+        "plaintext": pt,
+        "order": order,
+        "shifts": shifts,
+        "width": width,
+        "period": period,
+        "alphabet": alphabet,
+        "variant": variant,
+    }
 
 
 if __name__ == "__main__":
@@ -208,34 +236,42 @@ if __name__ == "__main__":
     def _sub_encode(pt, shifts, alph, variant="vig"):
         idx = _ai(alph)
         return "".join(
-            alph[((idx[c] + shifts[i % len(shifts)]) % 26) if variant == "vig"
-                 else ((shifts[i % len(shifts)] - idx[c]) % 26)]
+            alph[
+                ((idx[c] + shifts[i % len(shifts)]) % 26)
+                if variant == "vig"
+                else ((shifts[i % len(shifts)] - idx[c]) % 26)
+            ]
             for i, c in enumerate(pt)
         )
 
-    base = ("OVERTHEQUIETMORNINGTHELIBRARIANSORTEDEACHVOLUMEONTHESHELFANDNOTEDITSTITLEINLEDGER"
-            "WHILESTUDENTSGATHEREDNEARTHEWINDOWSTOREADBENEATHTHEWARMLIGHTOFTHERISINGSUNOUTSIDE"
-            "ABROADRIVERWOUNDPASTTHEOLDSTONEBRIDGEWHEREFARMERSCARRIEDBASKETSOFFRESHFRUITTOTOWN")
+    base = (
+        "OVERTHEQUIETMORNINGTHELIBRARIANSORTEDEACHVOLUMEONTHESHELFANDNOTEDITSTITLEINLEDGER"
+        "WHILESTUDENTSGATHEREDNEARTHEWINDOWSTOREADBENEATHTHEWARMLIGHTOFTHERISINGSUNOUTSIDE"
+        "ABROADRIVERWOUNDPASTTHEOLDSTONEBRIDGEWHEREFARMERSCARRIEDBASKETSOFFRESHFRUITTOTOWN"
+    )
     PERIOD, WIDTH = 11, 16
     overall = True
 
     # Core test (deterministic): given the TRUE per-class shifts, the multiple-anagramming
     # assembler recovers the EXACT column order. This is the validated capability; the blind
     # pipeline below additionally has to bootstrap the shifts (stochastic at large width).
-    print("=== adjacency self-test: assemble_order recovers exact order from true shifts ===",
-          flush=True)
+    print(
+        "=== adjacency self-test: assemble_order recovers exact order from true shifts ===",
+        flush=True,
+    )
     exact = 0
     for sd in range(5):
         rng = random.Random(sd)
         pt = (base * 3)[:272]
         shifts = [rng.randrange(26) for _ in range(PERIOD)]
-        order = list(range(WIDTH)); rng.shuffle(order)
+        order = list(range(WIDTH))
+        rng.shuffle(order)
         ct = _encode_letters(_sub_encode(pt, shifts, KRYPTOS, "vig"), order)
         rec_inv = assemble_order(ct, shifts, KRYPTOS, "vig", WIDTH, PERIOD, beam=2000)
         idx = _ai(KRYPTOS)
         S = _decode_letters(ct, rec_inv)
         out = "".join(KRYPTOS[(idx[c] - shifts[i % PERIOD]) % 26] for i, c in enumerate(S))
-        m = sum(a == b for a, b in zip(out, pt)) / len(pt)
+        m = sum(a == b for a, b in zip(out, pt, strict=False)) / len(pt)
         exact += m >= 0.99
         print(f"  seed={sd}: assembler char-match={m:.0%}", flush=True)
     core_ok = exact >= 4
@@ -252,14 +288,21 @@ if __name__ == "__main__":
     rng = random.Random(23)
     pt = (base * 3)[:272]
     shifts = [rng.randrange(26) for _ in range(PERIOD)]
-    order = list(range(WIDTH)); rng.shuffle(order)
+    order = list(range(WIDTH))
+    rng.shuffle(order)
     ct = _encode_letters(_sub_encode(pt, shifts, KRYPTOS, "vig"), order)
     res = solve(ct, WIDTH, PERIOD, "KRYPTOS", "vig", restarts=R, seed=1)
-    match = sum(a == b for a, b in zip(res["plaintext"], pt)) / len(pt)
+    match = sum(a == b for a, b in zip(res["plaintext"], pt, strict=False)) / len(pt)
     blind_ok = match >= 0.85
     overall = overall and blind_ok
-    print(f"  BLIND p{PERIOD} w{WIDTH} R{R} (seed23): match={match:.0%} score={res['score']:.0f} "
-          f"-> {'PASS' if blind_ok else 'FAIL'}", flush=True)
-    print(f"\nSELF-TEST {'PASSED' if overall else 'FAILED'} "
-          f"(deterministic assembler core + fixed-seed blind crack)", flush=True)
+    print(
+        f"  BLIND p{PERIOD} w{WIDTH} R{R} (seed23): match={match:.0%} score={res['score']:.0f} "
+        f"-> {'PASS' if blind_ok else 'FAIL'}",
+        flush=True,
+    )
+    print(
+        f"\nSELF-TEST {'PASSED' if overall else 'FAILED'} "
+        f"(deterministic assembler core + fixed-seed blind crack)",
+        flush=True,
+    )
     sys.exit(0 if overall else 1)

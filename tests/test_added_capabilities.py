@@ -16,7 +16,7 @@ import random
 import pytest
 
 from buttcrack import analysis, keysources, transsub
-from buttcrack.ciphers.columnar import _decode_units, _encode_units, _encode_letters
+from buttcrack.ciphers.columnar import _decode_units, _encode_letters, _encode_units
 from buttcrack.scoring import LANGUAGES, get_scorer, ngram_table_available
 from buttcrack.text import only_letters
 
@@ -60,7 +60,10 @@ def test_unit3_preserves_trigrams():
     # length-3 blocks is unchanged by the column shuffle.
     s = ENGLISH[: 3 * (len(ENGLISH) // 3)]
     ct = _encode_units(s, [2, 0, 1], 3)
-    blocks = lambda t: sorted(t[i : i + 3] for i in range(0, len(t), 3))
+
+    def blocks(t):
+        return sorted(t[i : i + 3] for i in range(0, len(t), 3))
+
     assert blocks(ct) == blocks(s)
 
 
@@ -86,8 +89,10 @@ def test_repeat_adjusted_flags_artifact_vs_real():
 def test_family_baseline_normal_and_outlier():
     rng = random.Random(3)
     # A family spanning flat-random up to English IoC, so the band brackets a flat target.
-    sibs = {f"S{i}": "".join(rng.choice("ABCDEFGHIJKLMNOPQRSTUVWXYZ") for _ in range(280))
-            for i in range(4)}
+    sibs = {
+        f"S{i}": "".join(rng.choice("ABCDEFGHIJKLMNOPQRSTUVWXYZ") for _ in range(280))
+        for i in range(4)
+    }
     sibs["S_eng"] = REAL_ENGLISH
     target = "".join(rng.choice("ABCDEFGHIJKLMNOPQRSTUVWXYZ") for _ in range(279))
     res = analysis.family_baseline(target, sibs)
@@ -100,8 +105,10 @@ def test_family_baseline_normal_and_outlier():
 
 # 4 ---------------------------------------------------------- corpus key sources
 def test_keys_from_corpus_kinds_and_cleanliness():
-    corpus = {"logA": "Two crates of maps arrived. The archivist filed each one.",
-              "logB": "The workshop is filled with old tools."}
+    corpus = {
+        "logA": "Two crates of maps arrived. The archivist filed each one.",
+        "logB": "The workshop is filled with old tools.",
+    }
     keys = keysources.keys_from_corpus(corpus, window_lengths=(6,))
     kinds = {k["kind"] for k in keys}
     assert {"full", "acrostic-word", "word", "window:6"} <= kinds
@@ -123,8 +130,10 @@ def test_compose_decompose_roundtrip():
 
 def test_compose_matches_known_composed_key():
     # A fixed composed-key vector: QuagmireKRYPTOS(WATERMELON, LAVENDER).
-    assert keysources.compose_key("WATERMELON", "LAVENDER") == \
-        "HHKVQYVMVKNMWUFNYXRTJLIFMZAYXPBBUMWPTRJQ"
+    assert (
+        keysources.compose_key("WATERMELON", "LAVENDER")
+        == "HHKVQYVMVKNMWUFNYXRTJLIFMZAYXPBBUMWPTRJQ"
+    )
 
 
 # 6 ----------------------------------------------------------------- Latin scoring

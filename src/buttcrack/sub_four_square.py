@@ -29,11 +29,11 @@ outer key by the drop-letter-pruned descent, ranking by the decode's objective.
 
 Public API
 ----------
-``sub_encode`` / ``sub_decode``                      periodic shift over a keyed alphabet (re-exported)
+``sub_encode`` / ``sub_decode``                  periodic shift over a keyed alphabet (re-exported)
 ``four_square_encode`` / ``four_square_decode``       Four-square inner given two 25-cell grids
 ``encrypt_sub_over_four_square``                      plant CT = outer(four_square(PT))
 ``recover_outer_key_over_four_square``                key-given-structure recovery (one pair)
-``crack_sub_over_four_square``                        driver over candidate square pairs + periods/drops
+``crack_sub_over_four_square``                   driver over candidate square pairs + periods/drops
 """
 
 from __future__ import annotations
@@ -130,8 +130,9 @@ def encrypt_sub_over_four_square(
     """Plant ``CT = periodic_sub( four_square( PT ) )`` — the structure this module attacks."""
     alpha = resolve_alphabet(outer_alphabet)
     a25 = fs_alphabet(drop_letter)
-    inner = four_square_encode(pt, fs_grid(tr_keyword, drop_letter),
-                               fs_grid(bl_keyword, drop_letter), a25)
+    inner = four_square_encode(
+        pt, fs_grid(tr_keyword, drop_letter), fs_grid(bl_keyword, drop_letter), a25
+    )
     return sub_encode(inner, alpha, outer_shifts)
 
 
@@ -313,8 +314,16 @@ def crack_sub_over_four_square(
                     break
                 for op in periods:
                     shifts, pt, score = recover_outer_key_over_four_square(
-                        letters, tg, bg, outer_alphabet=outer_alphabet, outer_period=op,
-                        drop_letter=drop, objective_fn=obj, rng=rng, brute_cap=brute_cap)
+                        letters,
+                        tg,
+                        bg,
+                        outer_alphabet=outer_alphabet,
+                        outer_period=op,
+                        drop_letter=drop,
+                        objective_fn=obj,
+                        rng=rng,
+                        brute_cap=brute_cap,
+                    )
                     if not pt:
                         continue
                     results.append((score, tg, bg, _shifts_to_keystr(shifts), pt))

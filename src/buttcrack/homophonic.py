@@ -111,7 +111,13 @@ def solve(ct: str, restarts: int = 30, iters: int = 20000) -> dict:
     """
     letters = only_letters(ct)
     if not letters:
-        return {"score": 0.0, "plaintext": "", "mapping": {}, "recovered": False, "word_coverage": 0.0}
+        return {
+            "score": 0.0,
+            "plaintext": "",
+            "mapping": {},
+            "recovered": False,
+            "word_coverage": 0.0,
+        }
 
     scorer = resolve_scorer("hexagrams")
     n, coded, floor = _hexagram_tables(scorer)
@@ -264,10 +270,14 @@ def solve(ct: str, restarts: int = 30, iters: int = 20000) -> dict:
     canonical = scorer.fitness(plaintext)  # faithful to the stated objective
     mapping_out = {syms[i]: _ALPHA[best_mapping[i]] for i in range(n_syms)}
     from .validate import solve_confidence
+
     conf = solve_confidence(plaintext, len(letters))
     return {
-        "score": canonical, "plaintext": plaintext, "mapping": mapping_out,
-        "recovered": conf["recovered"], "word_coverage": conf["word_coverage"],
+        "score": canonical,
+        "plaintext": plaintext,
+        "mapping": mapping_out,
+        "recovered": conf["recovered"],
+        "word_coverage": conf["word_coverage"],
     }
 
 
@@ -293,7 +303,7 @@ if __name__ == "__main__":
     rng = random.Random(1234)
     perm = list(_ALPHA)
     rng.shuffle(perm)
-    enc = {p: c for p, c in zip(_ALPHA, perm)}
+    enc = {p: c for p, c in zip(_ALPHA, perm, strict=False)}
     ct = "".join(enc[ch] for ch in plain)
 
     t0 = time.time()
@@ -301,7 +311,7 @@ if __name__ == "__main__":
     dt = time.time() - t0
 
     recovered = res["plaintext"]
-    matches = sum(1 for a, b in zip(recovered, plain) if a == b)
+    matches = sum(1 for a, b in zip(recovered, plain, strict=False) if a == b)
     pct = 100.0 * matches / len(plain)
 
     print(f"letters           : {len(plain)}")
@@ -312,8 +322,9 @@ if __name__ == "__main__":
     print(f"plaintext (head)  : {plain[:80]}")
     print(f"recovered (head)  : {recovered[:80]}")
     print(f"verify fitness    : {resolve_scorer('hexagrams').fitness(recovered):.4f}")
-    assert abs(res["score"] - resolve_scorer("hexagrams").fitness(recovered)) < 1e-9, \
+    assert abs(res["score"] - resolve_scorer("hexagrams").fitness(recovered)) < 1e-9, (
         "reported score must equal resolve_scorer('hexagrams').fitness(plaintext)"
+    )
     status = "PASS" if pct >= 90.0 else "FAIL"
     print(f"RESULT            : {status} (threshold 90%)")
     assert pct >= 90.0, f"recovery {pct:.1f}% below 90% threshold"

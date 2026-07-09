@@ -28,10 +28,24 @@ def test_subfoursq_cli_ranks_planted_pair(capsys):
 
     ct = encrypt_sub_over_four_square(
         "EARLYINTHEMORNINGTHEGARDENERWALKSTHELONGROWSOFTHEORCHARDCHECKINGEACHTREE",
-        "WATERMELON", "LAVENDER", outer_shifts=[3, 17, 0, 9, 22, 5, 14],
+        "WATERMELON",
+        "LAVENDER",
+        outer_shifts=[3, 17, 0, 9, 22, 5, 14],
     )
-    rc = main(["subfoursq", ct, "--squares", "WATERMELON,LAVENDER,MEADOW,SILVER",
-               "--outer-period", "7", "--top", "3", "--json", "--compact"])
+    rc = main(
+        [
+            "subfoursq",
+            ct,
+            "--squares",
+            "WATERMELON,LAVENDER,MEADOW,SILVER",
+            "--outer-period",
+            "7",
+            "--top",
+            "3",
+            "--json",
+            "--compact",
+        ]
+    )
     rows = json.loads(capsys.readouterr().out)
     assert rc == 0 and rows
     assert {"tr_square", "bl_square", "key", "plaintext", "score"} <= set(rows[0])
@@ -44,10 +58,26 @@ def test_subserpf_cli_runs_and_emits_json(capsys):
 
     ct = encrypt_sub_over_seriated_playfair(
         "EARLYINTHEMORNINGTHEGARDENERWALKSTHELONGROWSOFTHEORCHARDCHECKINGE",
-        "BUTTERFLY", inner_period=7, outer_shifts=[3, 17, 0, 9, 22, 5, 14],
+        "BUTTERFLY",
+        inner_period=7,
+        outer_shifts=[3, 17, 0, 9, 22, 5, 14],
     )
-    rc = main(["subserpf", ct, "--squares", "BUTTERFLY,MEADOW", "--inner-period", "7",
-               "--outer-period", "7", "--top", "2", "--json", "--compact"])
+    rc = main(
+        [
+            "subserpf",
+            ct,
+            "--squares",
+            "BUTTERFLY,MEADOW",
+            "--inner-period",
+            "7",
+            "--outer-period",
+            "7",
+            "--top",
+            "2",
+            "--json",
+            "--compact",
+        ]
+    )
     rows = json.loads(capsys.readouterr().out)
     assert rc == 0 and rows
     assert {"square", "key", "plaintext", "score"} <= set(rows[0])

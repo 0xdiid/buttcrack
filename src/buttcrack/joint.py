@@ -18,16 +18,16 @@ substitution is a periodic shift cipher (Vigenere/Beaufort) in a keyed alphabet
 state by best-shift-per-residue-class, so each outer move is scored on its true best
 plaintext.
 """
+
 from __future__ import annotations
 
 import math
 import random
-from collections import Counter
 
-from .scoring import get_scorer, resolve_scorer, letter_entropy, ENGLISH_MONOGRAM_FREQ
-from .text import only_letters
-from .ciphers.columnar import _decode_letters as _col_decode
 from .ciphers import incomplete_columnar as _icol
+from .ciphers.columnar import _decode_letters as _col_decode
+from .scoring import ENGLISH_MONOGRAM_FREQ, get_scorer, resolve_scorer
+from .text import only_letters
 
 KRYPTOS = "KRYPTOSABCDEFGHIJLMNQUVWXZ"
 STANDARD = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -37,7 +37,7 @@ _EXPECT = [ENGLISH_MONOGRAM_FREQ[chr(65 + i)] for i in range(26)]
 def keyed_alphabet(keyword: str) -> str:
     """Standard keyed alphabet from a keyword (dedup + remaining A-Z)."""
     seen: list[str] = []
-    for ch in (keyword + STANDARD):
+    for ch in keyword + STANDARD:
         if ch not in seen:
             seen.append(ch)
     return "".join(seen)
@@ -51,7 +51,9 @@ def _alphabet(spec: str) -> str:
     return keyed_alphabet(spec.upper())
 
 
-def _best_shifts(stream_idx: list[int], period: int, variant: str, expect: list[float]) -> list[int]:
+def _best_shifts(
+    stream_idx: list[int], period: int, variant: str, expect: list[float]
+) -> list[int]:
     """Best shift per residue class i%period by min chi-squared vs English monograms.
 
     ``expect[j]`` is the expected English frequency of the letter at *alphabet index* j
@@ -99,8 +101,20 @@ def _decode_columnar(ct: str, order: list[int], complete: bool) -> str:
 class _Config:
     """One (width, period, alphabet, variant, layer) cell for the climber."""
 
-    __slots__ = ("ct", "width", "period", "alph", "variant", "layer", "complete",
-                 "n", "ai", "expect", "_cidx", "_outer_desub")
+    __slots__ = (
+        "ct",
+        "width",
+        "period",
+        "alph",
+        "variant",
+        "layer",
+        "complete",
+        "n",
+        "ai",
+        "expect",
+        "_cidx",
+        "_outer_desub",
+    )
 
     def __init__(self, ct, width, period, alph, variant, layer):
         self.ct = ct
@@ -110,7 +124,7 @@ class _Config:
         self.variant = variant
         self.layer = layer
         self.n = len(ct)
-        self.complete = (self.n % width == 0)
+        self.complete = self.n % width == 0
         self.ai = {c: i for i, c in enumerate(alph)}
         # expected English frequency reindexed into the (keyed) alphabet's index space
         self.expect = [ENGLISH_MONOGRAM_FREQ[alph[j]] for j in range(26)]
@@ -129,6 +143,7 @@ class _Config:
             shifts = _best_shifts(sidx, self.period, self.variant, self.expect)
             return _desub(sidx, shifts, self.period, self.variant, self.alph)
         else:  # outer: de-sub first (order-independent), then de-transpose
+            assert self._outer_desub is not None  # set in __init__ when layer == "outer"
             out = _decode_columnar(self._outer_desub, order, self.complete)
             return out if len(out) == self.n else ""
 
@@ -161,8 +176,9 @@ def _anneal(cfg: _Config, scorer, rng, iters: int, t0: float, t1: float):
     return best_score, best_order, best_pt
 
 
-def solve_config(ct, width, period, alph_spec, variant, layer,
-                 restarts=20, iters=4000, ngram="hexagrams", seed=0):
+def solve_config(
+    ct, width, period, alph_spec, variant, layer, restarts=20, iters=4000, ngram="hexagrams", seed=0
+):
     """Run the dual climber for one config; returns dict(score, plaintext, order, ...)."""
     ct = only_letters(ct)
     alph = _alphabet(alph_spec)
@@ -171,33 +187,62 @@ def solve_config(ct, width, period, alph_spec, variant, layer,
     rng = random.Random(seed)
     best = (-1e18, None, None)
     t0, t1 = 0.5, 0.02
-    for r in range(restarts):
+    for _r in range(restarts):
         s, order, pt = _anneal(cfg, scorer, random.Random(rng.randrange(1 << 30)), iters, t0, t1)
         if s > best[0]:
             best = (s, order, pt)
     score, order, pt = best
     from .validate import solve_confidence
+
     conf = solve_confidence(pt, len(ct)) if pt else {"recovered": False, "word_coverage": 0.0}
     return {
-        "score": score, "plaintext": pt, "order": order,
-        "width": width, "period": period, "alphabet": alph_spec,
-        "variant": variant, "layer": layer, "ngram": scorer.name,
+        "score": score,
+        "plaintext": pt,
+        "order": order,
+        "width": width,
+        "period": period,
+        "alphabet": alph_spec,
+        "variant": variant,
+        "layer": layer,
+        "ngram": scorer.name,
         "quad": get_scorer("quadgrams").score(pt) if pt else None,
-        "recovered": conf["recovered"], "word_coverage": conf["word_coverage"],
+        "recovered": conf["recovered"],
+        "word_coverage": conf["word_coverage"],
     }
 
 
-def solve(ct, *, layer="inner", widths=range(6, 18), periods=range(9, 17),
-          alphabets=("KRYPTOS", "STD"), variants=("vig", "beaufort"),
-          restarts=20, iters=4000, ngram="hexagrams", seed=0, top=5):
+def solve(
+    ct,
+    *,
+    layer="inner",
+    widths=range(6, 18),
+    periods=range(9, 17),
+    alphabets=("KRYPTOS", "STD"),
+    variants=("vig", "beaufort"),
+    restarts=20,
+    iters=4000,
+    ngram="hexagrams",
+    seed=0,
+    top=5,
+):
     """Sweep the dual climber over configs; return the best results (sorted)."""
     results = []
     for width in widths:
         for period in periods:
             for alph in alphabets:
                 for variant in variants:
-                    r = solve_config(ct, width, period, alph, variant, layer,
-                                     restarts=restarts, iters=iters, ngram=ngram, seed=seed)
+                    r = solve_config(
+                        ct,
+                        width,
+                        period,
+                        alph,
+                        variant,
+                        layer,
+                        restarts=restarts,
+                        iters=iters,
+                        ngram=ngram,
+                        seed=seed,
+                    )
                     results.append(r)
     results.sort(key=lambda d: -d["score"])
     return results[:top]

@@ -67,7 +67,7 @@ def test_friedman_estimate_is_a_sane_scalar():
 
 # ---- two-message cross-text test ----------------------------------------- #
 def test_mutual_ioc_separates_related_from_random():
-    assert an.mutual_index_of_coincidence(EN, EN2) > 0.058     # two English texts
+    assert an.mutual_index_of_coincidence(EN, EN2) > 0.058  # two English texts
     assert an.mutual_index_of_coincidence(_rand(200, 2), _rand(200, 3)) < 0.045
 
 
@@ -76,8 +76,8 @@ def test_mutual_kappa_scan_detects_shared_key_depth():
     same = an.mutual_kappa_scan(a, b, max_shift=30)
     c = _vig(EN2[:170], "ANOTHERKEY")  # different key
     diff = an.mutual_kappa_scan(a, c, max_shift=30)
-    assert same[0]["z"] > 3.0                       # depth detected
-    assert same[0]["z"] > diff[0]["z"] + 0.8        # and clearly beats the unrelated pair
+    assert same[0]["z"] > 3.0  # depth detected
+    assert same[0]["z"] > diff[0]["z"] + 0.8  # and clearly beats the unrelated pair
 
 
 # ---- distributional discriminants ---------------------------------------- #

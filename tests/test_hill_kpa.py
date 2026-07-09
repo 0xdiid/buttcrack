@@ -8,10 +8,8 @@ generalisation (a shape that turns up in real layered puzzles).
 
 from __future__ import annotations
 
-import pytest
-
-from buttcrack.ciphers.hill import Hill
 from buttcrack import hill_kpa
+from buttcrack.ciphers.hill import Hill
 
 KRY = "KRYPTOSABCDEFGHIJLMNQUVWXZ"
 
@@ -54,9 +52,7 @@ def test_recover_matrix_2x2():
 
 def test_recover_matrix_3x3_roundtrips():
     """Recover a 3x3 key from a crib and confirm it decodes the whole message."""
-    pt = "".join(
-        c for c in "MEETMEATDAWNBYTHEOLDOAKTREEONTHENORTHSIDE".upper() if c.isalpha()
-    )
+    pt = "".join(c for c in "MEETMEATDAWNBYTHEOLDOAKTREEONTHENORTHSIDE".upper() if c.isalpha())
     if len(pt) % 3:
         pt += "X" * (3 - len(pt) % 3)
     ct = Hill().encode(pt, "6,24,1,13,16,10,20,17,15")
@@ -79,9 +75,7 @@ def test_recover_matrix_offset_crib():
 def test_crib_drag_finds_offset_and_decrypts():
     """A crib whose position is UNKNOWN is found by sliding across block offsets; the true
     plaintext ranks first under the default (English) scorer."""
-    pt = "".join(
-        c for c in "ATDAWNWEMARCHEDNORTHWESTTOWARDTHERIVERCROSSING".upper() if c.isalpha()
-    )
+    pt = "".join(c for c in "ATDAWNWEMARCHEDNORTHWESTTOWARDTHERIVERCROSSING".upper() if c.isalpha())
     if len(pt) % 3:
         pt += "X" * (3 - len(pt) % 3)
     ct = Hill().encode(pt, "6,24,1,13,16,10,20,17,15")
@@ -99,7 +93,10 @@ def test_crib_drag_custom_scorer_for_non_english():
     if len(pt) % 3:
         pt += "X" * (3 - len(pt) % 3)
     ct = Hill().encode(pt, "6,24,1,13,16,10,20,17,15")
-    compress = lambda s: -len(zlib.compress(s.encode(), 9))  # higher = more compressible
+
+    def compress(s):  # higher = more compressible
+        return -len(zlib.compress(s.encode(), 9))
+
     hits = hill_kpa.crib_drag("NORTHEIGH", ct, 3, alphabet="STD", scorer=compress, top=5)
     assert hits and hits[0]["plaintext"] == pt
 

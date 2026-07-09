@@ -135,13 +135,11 @@ def _diagonal_route(
     """
     if anti:
         groups = [
-            [(r, s - r) for r in range(rows) if 0 <= s - r < cols]
-            for s in range(rows + cols - 1)
+            [(r, s - r) for r in range(rows) if 0 <= s - r < cols] for s in range(rows + cols - 1)
         ]
     else:
         groups = [
-            [(r, r - d) for r in range(rows) if 0 <= r - d < cols]
-            for d in range(-(cols - 1), rows)
+            [(r, r - d) for r in range(rows) if 0 <= r - d < cols] for d in range(-(cols - 1), rows)
         ]
     top = start_corner[0] == "t"
     left = start_corner[1] == "l"

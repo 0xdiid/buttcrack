@@ -191,9 +191,7 @@ def make_objective(
 # --------------------------------------------------------------------------- #
 # Key-given-structure recovery (one candidate square)
 # --------------------------------------------------------------------------- #
-def _admissible_shifts(
-    c_idx: list[int], n: int, p: int, drop_pos: int
-) -> list[list[int]]:
+def _admissible_shifts(c_idx: list[int], n: int, p: int, drop_pos: int) -> list[list[int]]:
     """Per-column shifts that leave the residual coset free of the drop letter.
 
     Stripping shift ``s`` maps ciphertext index ``v`` to residual index ``(v - s) % 26``;

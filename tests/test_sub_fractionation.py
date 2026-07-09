@@ -35,7 +35,12 @@ ENGLISH = only_letters(
 
 def _plant(pt, square_kw, shifts, *, inner=7, drop="J", alpha="KRYPTOS"):
     return encrypt_sub_over_bifid(
-        pt, square_kw, outer_alphabet=alpha, inner_period=inner, outer_shifts=shifts, drop_letter=drop
+        pt,
+        square_kw,
+        outer_alphabet=alpha,
+        inner_period=inner,
+        outer_shifts=shifts,
+        drop_letter=drop,
     )
 
 
@@ -54,8 +59,13 @@ def test_recover_outer_key_given_correct_square():
     ct = _plant(ENGLISH, "KEYWORD", shifts)
     sq = resolve_square("KEYWORD", "J")
     rec_shifts, pt, score = recover_outer_key_over_bifid(
-        ct, sq, outer_alphabet="KRYPTOS", inner_period=7, outer_period=7,
-        objective="fitness", rng=random.Random(0),
+        ct,
+        sq,
+        outer_alphabet="KRYPTOS",
+        inner_period=7,
+        outer_period=7,
+        objective="fitness",
+        rng=random.Random(0),
     )
     assert rec_shifts == shifts
     assert only_letters(pt) == ENGLISH
@@ -74,7 +84,11 @@ def test_wrong_square_plateaus_far_below():
     near = list(good)
     near[0], near[1] = near[1], near[0]
     _, pt_bad, s_bad = recover_outer_key_over_bifid(
-        ct, "".join(near), outer_alphabet="KRYPTOS", inner_period=7, outer_period=7,
+        ct,
+        "".join(near),
+        outer_alphabet="KRYPTOS",
+        inner_period=7,
+        outer_period=7,
         rng=random.Random(0),
     )
     assert s_good > s_bad + 1.0  # objective (fitness) clearly separates
@@ -87,9 +101,14 @@ def test_driver_recovers_square_key_and_plaintext():
     shifts = [rng.randrange(26) for _ in range(7)]
     ct = _plant(ENGLISH, "KEYWORD", shifts)
     res = crack_sub_over_bifid(
-        ct, outer_alphabet="KRYPTOS", inner_period=7, outer_period=7,
+        ct,
+        outer_alphabet="KRYPTOS",
+        inner_period=7,
+        outer_period=7,
         squares=["KEYWORD", "MYSTERY", "PALIMPSEST", "SHADOW", "CIPHER"],
-        objective="fitness", top=3, rng=random.Random(0),
+        objective="fitness",
+        top=3,
+        rng=random.Random(0),
     )
     top_square, _key, top_pt, top_score = res[0]
     assert top_square == resolve_square("KEYWORD", "J")
@@ -106,13 +125,27 @@ def test_dropletter_sweep_recovers_non_j_bifid():
     ct = _plant(qfree, "RIVERBANK", shifts, drop="Q")
     squares = ["RIVERBANK", "MAPLE", "PALIMPSEST", "KEYWORD"]
     j_only = crack_sub_over_bifid(
-        ct, outer_alphabet="KRYPTOS", inner_period=7, outer_period=7,
-        squares=squares, objective="fitness", drop_letter="J", top=1, rng=random.Random(0),
+        ct,
+        outer_alphabet="KRYPTOS",
+        inner_period=7,
+        outer_period=7,
+        squares=squares,
+        objective="fitness",
+        drop_letter="J",
+        top=1,
+        rng=random.Random(0),
     )
     assert only_letters(j_only[0][2]) != qfree  # wrong drop -> structurally blind
     swept = crack_sub_over_bifid(
-        ct, outer_alphabet="KRYPTOS", inner_period=7, outer_period=7,
-        squares=squares, objective="fitness", drop_letter="IJQZ", top=1, rng=random.Random(0),
+        ct,
+        outer_alphabet="KRYPTOS",
+        inner_period=7,
+        outer_period=7,
+        squares=squares,
+        objective="fitness",
+        drop_letter="IJQZ",
+        top=1,
+        rng=random.Random(0),
     )
     assert only_letters(swept[0][2]) == qfree
 
@@ -139,8 +172,14 @@ def test_route_payload_ioc_and_repeats_recover_english_fitness_misses():
 
     def run(obj):
         return crack_sub_over_bifid(
-            ct, outer_alphabet="KRYPTOS", inner_period=7, outer_period=7,
-            squares=squares, objective=obj, top=1, rng=random.Random(0),
+            ct,
+            outer_alphabet="KRYPTOS",
+            inner_period=7,
+            outer_period=7,
+            squares=squares,
+            objective=obj,
+            top=1,
+            rng=random.Random(0),
         )[0]
 
     for obj in ("repeats", "ioc"):

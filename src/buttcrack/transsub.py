@@ -19,6 +19,7 @@ repeats* within the message (period < ~length/4).  When the effective keystream 
 repeat (a long random key, or two coprime substitutions whose lcm exceeds the length), the
 construction is one-time-pad-grade and not recoverable blind.
 """
+
 from __future__ import annotations
 
 import math
@@ -105,7 +106,9 @@ def _best_reveal_for_width(letters: str, width: int, unit: int = 1) -> float:
     return best
 
 
-def _calibrate_reveal_null(letters: str, search, *, samples: int, seed: int, unit: int = 1) -> dict[str, Any]:
+def _calibrate_reveal_null(
+    letters: str, search, *, samples: int, seed: int, unit: int = 1
+) -> dict[str, Any]:
     """Run ``search`` (best reveal-IoC its order search achieves on a letter string) on the
     real text and on shuffles, and label the verdict.
 
@@ -116,14 +119,16 @@ def _calibrate_reveal_null(letters: str, search, *, samples: int, seed: int, uni
     """
     null = search_aware_null(letters, search, samples=samples, seed=seed, unit=unit)
     null["verdict"] = (
-        "beats null" if (null["beats_null_max"] or null["z"] >= 3.0)
-        else "within null (overfit)"
+        "beats null" if (null["beats_null_max"] or null["z"] >= 3.0) else "within null (overfit)"
     )
     return null
 
 
-def _enum_reveal_null(letters: str, widths, *, samples: int, seed: int, unit: int = 1) -> dict[str, Any]:
-    """Search-aware null for the FULL w! order enumeration over ``widths`` (at ``unit`` granularity)."""
+def _enum_reveal_null(
+    letters: str, widths, *, samples: int, seed: int, unit: int = 1
+) -> dict[str, Any]:
+    """Search-aware null for the FULL w! order enumeration over ``widths`` (at ``unit``
+    granularity)."""
     enum_widths = [w for w in widths if 2 <= w <= len(letters) and w <= ENUM_MAX_WIDTH]
 
     def search(s: str) -> float:
@@ -159,6 +164,7 @@ def _sa_reveal_null(
     The honest null is the SAME SA run on shuffles of the same letters; cheaper restart/
     iter budgets keep it affordable while still calibrating the maximum.
     """
+
     def search(s: str) -> float:
         rng = random.Random(seed)
         return _sa_double(s, width, restarts=restarts, iters=iters, rng=rng)[0]
@@ -187,7 +193,9 @@ def _solve_inner(
     dict with ``plaintext``, ``score``, ``coverage`` and a ``substitution`` descriptor.
     """
     inner = dictionary_attack(
-        stream, scorer, "Q3",
+        stream,
+        scorer,
+        "Q3",
         forced_period=period_hint if period_hint and period_hint >= 2 else None,
     )
     if inner is not None:
@@ -323,9 +331,17 @@ def crack_transposition_over_sub(
                 rv, period = reveal_score(undone)
                 if rv > best_reveal:
                     best_reveal = rv
-                    candidates = [(undone, {"layer_order": "transposition-over-substitution",
-                                            "transposition": "columnar",
-                                            "columnar_order": order}, period)]
+                    candidates = [
+                        (
+                            undone,
+                            {
+                                "layer_order": "transposition-over-substitution",
+                                "transposition": "columnar",
+                                "columnar_order": order,
+                            },
+                            period,
+                        )
+                    ]
     else:
         for width in widths:
             rv, o1, o2, period = _sa_double(
@@ -334,19 +350,33 @@ def crack_transposition_over_sub(
             if rv > best_reveal:
                 best_reveal = rv
                 undone = _undo_double(ct, o1, o2)
-                candidates = [(undone, {"layer_order": "transposition-over-substitution",
-                                        "transposition": "double-columnar",
-                                        "columnar_width": width,
-                                        "columnar_orders": [o1, o2]}, period)]
+                candidates = [
+                    (
+                        undone,
+                        {
+                            "layer_order": "transposition-over-substitution",
+                            "transposition": "double-columnar",
+                            "columnar_width": width,
+                            "columnar_orders": [o1, o2],
+                        },
+                        period,
+                    )
+                ]
 
     if not candidates:
-        return {"structure": None, "reveal_ioc": round(best_reveal, 4),
-                "plaintext": "", "note": "no transposition candidate found"}
+        return {
+            "structure": None,
+            "reveal_ioc": round(best_reveal, 4),
+            "plaintext": "",
+            "note": "no transposition candidate found",
+        }
 
     undone, structure, period = candidates[0]
     header = keyed_alphabet(alphabet)
     inner = _solve_inner(
-        undone, scorer, alphabet=alphabet,
+        undone,
+        scorer,
+        alphabet=alphabet,
         period_hint=period if period >= 2 else None,
     )
     plaintext = inner["plaintext"]
@@ -382,9 +412,12 @@ def crack_transposition_over_sub(
         # (not just on a clean solve) — a tempting reveal that sits inside the shuffled-SA
         # null is the CODEX trap, and the caller needs that flag even when coverage is low.
         result["reveal_null"] = _sa_reveal_null(
-            ct, structure["columnar_width"],
-            restarts=min(sa_restarts, 30), iters=min(sa_iters, 600),
-            samples=min(null_samples, 8), seed=null_seed,
+            ct,
+            structure["columnar_width"],
+            restarts=min(sa_restarts, 30),
+            iters=min(sa_iters, 600),
+            samples=min(null_samples, 8),
+            seed=null_seed,
         )
     return result
 
@@ -439,7 +472,9 @@ def crack_columnar_reveal_enum(
     best: dict[str, Any] | None = None
     for rv, width, order, period, undone in scored[:top_orders]:
         inner = _solve_inner(
-            undone, scorer, alphabet=alphabet,
+            undone,
+            scorer,
+            alphabet=alphabet,
             period_hint=period if period >= 2 else None,
         )
         plaintext = inner["plaintext"]
@@ -530,21 +565,25 @@ def sweep_known_alphabet(
 
     text = only_letters(ct)
     if len(text) < 8:
-        raise ValueError("ciphertext too short for a meaningful inner-sub sweep (need >= 8 letters)")
+        raise ValueError(
+            "ciphertext too short for a meaningful inner-sub sweep (need >= 8 letters)"
+        )
     periods = list(periods)
     cands: list[dict[str, Any]] = []
     for order in orders:
         order = list(order)
         undone = _undo_columnar(text, order, incomplete=False, unit=unit)
         r = solve_fixed_alphabet(undone, alphabet, kind=kind, periods=periods)
-        cands.append({
-            "order": order,
-            "score": round(r["score"], 4),
-            "period": r["period"],
-            "word_coverage": r["word_coverage"],
-            "recovered": r["recovered"],
-            "plaintext": r["plaintext"],
-        })
+        cands.append(
+            {
+                "order": order,
+                "score": round(r["score"], 4),
+                "period": r["period"],
+                "word_coverage": r["word_coverage"],
+                "recovered": r["recovered"],
+                "plaintext": r["plaintext"],
+            }
+        )
     cands.sort(key=lambda d: (-d["word_coverage"], -d["score"]))
 
     rng = random.Random(null_seed)
@@ -618,7 +657,7 @@ def crack_double_columnar_keywords(
         pairs = _keyword_orders(wordlist, length)
         for kw1, o1 in pairs:
             for kw2, o2 in pairs:
-                for incomplete in ((False,) if unit != 1 else (False, True)):
+                for incomplete in (False,) if unit != 1 else (False, True):
                     inner_ct = _undo_columnar(text, o1, incomplete=incomplete, unit=unit)
                     undone = _undo_columnar(inner_ct, o2, incomplete=incomplete, unit=unit)
                     swept.append((o1, o2, incomplete))
@@ -630,12 +669,16 @@ def crack_double_columnar_keywords(
                     # cheap screen); otherwise scan the whole band with the full solve.
                     if period in period_list:
                         sc, plaintext, meta = solve_inner_periodic_screen(
-                            undone, scorer, period=period,
+                            undone,
+                            scorer,
+                            period=period,
                             alphabets=(alphabet, "STD"),
                         )
                     else:
                         sc, plaintext, meta = solve_inner_periodic(
-                            undone, scorer, alphabets=(alphabet, "STD"),
+                            undone,
+                            scorer,
+                            alphabets=(alphabet, "STD"),
                             periods=period_list or range(2, 16),
                         )
                     coverage = long_word_coverage(plaintext)
@@ -649,7 +692,7 @@ def crack_double_columnar_keywords(
                                 "columnar_orders": [o1, o2],
                                 "incomplete": incomplete,
                                 "substitution": f"{meta.get('convention', '?')}/"
-                                                f"{meta.get('alphabet', alphabet)}",
+                                f"{meta.get('alphabet', alphabet)}",
                                 "convention": meta.get("convention"),
                                 "period": meta.get("period"),
                             },
@@ -686,9 +729,17 @@ def crack_double_columnar_keywords(
 
     def search(s: str) -> float:
         return max(
-            (reveal_score(_undo_columnar(_undo_columnar(s, o1, incomplete=inc, unit=unit),
-                                         o2, incomplete=inc, unit=unit))[0]
-             for o1, o2, inc in triples),
+            (
+                reveal_score(
+                    _undo_columnar(
+                        _undo_columnar(s, o1, incomplete=inc, unit=unit),
+                        o2,
+                        incomplete=inc,
+                        unit=unit,
+                    )
+                )[0]
+                for o1, o2, inc in triples
+            ),
             default=0.0,
         )
 
@@ -712,8 +763,8 @@ def reveal_spectrum(
 
     For each width in ``widths`` (capped at :data:`ENUM_MAX_WIDTH` for the full ``w!``
     enumeration) and each granularity in ``units`` (1 = letters, 3 = trigraph blocks — the
-    block-transposition shape), reports the best reveal-IoC over all read-orders and the period at which it
-    peaks, plus a **granularity-matched** search-aware-null verdict (``beats null`` vs
+    block-transposition shape), reports the best reveal-IoC over all read-orders and the period
+    at which it peaks, plus a **granularity-matched** search-aware-null verdict (``beats null`` vs
     ``within null (overfit)``) so :command:`butt diagnose` can tell a real hidden-substitution-
     under-transposition layering from selection-bias noise, AND at what block size. Widths
     above the enumeration cap are skipped (recovered by SA, not enumerated).
@@ -735,19 +786,24 @@ def reveal_spectrum(
                 if rv > best_rv:
                     best_rv, best_order, best_period = rv, order, period
             null = _calibrate_reveal_null(
-                text, lambda s, w=width, u=unit: _best_reveal_for_width(s, w, u),
-                samples=null_samples, seed=null_seed, unit=unit,
+                text,
+                lambda s, w=width, u=unit: _best_reveal_for_width(s, w, u),
+                samples=null_samples,
+                seed=null_seed,
+                unit=unit,
             )
-            rows.append({
-                "width": width,
-                "unit": unit,
-                "best_reveal": round(best_rv, 4),
-                "period": best_period,
-                "best_order": best_order,
-                "verdict": null["verdict"],
-                "null": null,
-            })
+            rows.append(
+                {
+                    "width": width,
+                    "unit": unit,
+                    "best_reveal": round(best_rv, 4),
+                    "period": best_period,
+                    "best_order": best_order,
+                    "verdict": null["verdict"],
+                    "null": null,
+                }
+            )
     rows.sort(key=lambda r: r["best_reveal"], reverse=True)
     beats = [r for r in rows if r["verdict"] == "beats null"]
-    best = (beats or rows or [None])[0]
+    best = beats[0] if beats else (rows[0] if rows else None)
     return {"raw_reveal": round(raw_rv, 4), "widths": rows, "best": best}

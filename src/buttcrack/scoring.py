@@ -204,6 +204,7 @@ def _load_table(name: str, lang: str = "english") -> tuple[int, dict[str, int]]:
         raw = None
     if raw is None:
         import os
+
         _p = os.path.join(os.path.dirname(__file__), "data", fname)
         if os.path.isfile(_p):
             with open(_p, encoding="ascii") as _f:

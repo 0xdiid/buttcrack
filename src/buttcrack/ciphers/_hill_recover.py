@@ -112,7 +112,10 @@ def _english_weights(alphabet: str) -> list[float]:
 
 def _blocks(indices: list[int], phase: int) -> list[tuple[int, int, int]]:
     nb = (len(indices) - phase) // 3
-    return [tuple(indices[phase + 3 * j : phase + 3 * j + 3]) for j in range(nb)]
+    return [
+        (indices[phase + 3 * j], indices[phase + 3 * j + 1], indices[phase + 3 * j + 2])
+        for j in range(nb)
+    ]
 
 
 def _row_chi(channel: list[int], q: int, winv: list[float]) -> float:
@@ -137,10 +140,10 @@ def _row_chi(channel: list[int], q: int, winv: list[float]) -> float:
             for t in range(26):
                 acc = 0.0
                 base = -t
-                for l in range(26):
-                    hl = sq[l]
+                for i in range(26):
+                    hl = sq[i]
                     if hl:
-                        acc += hl * winv[(l + base) % 26]
+                        acc += hl * winv[(i + base) % 26]
                 c = acc / m - m
                 if c < cmin:
                     cmin = c
@@ -149,7 +152,9 @@ def _row_chi(channel: list[int], q: int, winv: list[float]) -> float:
     return best
 
 
-def _apply_scalar(channel: list[int], q: int, u: int, winv: list[float]) -> tuple[float, list[int], list[int]]:
+def _apply_scalar(
+    channel: list[int], q: int, u: int, winv: list[float]
+) -> tuple[float, list[int], list[int]]:
     """For a fixed scalar ``u``, resolve the per-class additive shift by chi-square.
 
     Returns ``(chi, plaintext_indices, offsets)``.
@@ -169,9 +174,9 @@ def _apply_scalar(channel: list[int], q: int, u: int, winv: list[float]) -> tupl
         cmin, targ = math.inf, 0
         for t in range(26):
             acc = 0.0
-            for l in range(26):
-                if sq[l]:
-                    acc += sq[l] * winv[(l - t) % 26]
+            for i in range(26):
+                if sq[i]:
+                    acc += sq[i] * winv[(i - t) % 26]
             c = acc / m - m
             if c < cmin:
                 cmin, targ = c, t
@@ -182,18 +187,21 @@ def _apply_scalar(channel: list[int], q: int, u: int, winv: list[float]) -> tupl
     return tot / q, out, offs
 
 
-def _resolve_stream(channel: list[int], q: int, winv: list[float]) -> tuple[float, int, list[int], list[int]]:
+def _resolve_stream(
+    channel: list[int], q: int, winv: list[float]
+) -> tuple[float, int, list[int], list[int]]:
     """Best (scalar, per-class shift) for a channel by chi-square vs English.
 
     Returns ``(chi, scalar, plaintext_indices, offsets)``. The scalar is the noisy
     freedom at short lengths — :func:`_polish` re-decides it by quadgram later.
     """
-    best = (math.inf, 1, None, None)
+    best: tuple[float, int, list[int] | None, list[int] | None] = (math.inf, 1, None, None)
     for u in UNITS:
         chi, out, offs = _apply_scalar(channel, q, u, winv)
         if chi < best[0]:
             best = (chi, u, out, offs)
-    return best
+    assert best[2] is not None and best[3] is not None  # UNITS is non-empty
+    return best[0], best[1], best[2], best[3]
 
 
 def _stream(channel: list[int], q: int, u: int, offs: list[int]) -> list[int]:
@@ -242,7 +250,12 @@ def _strong(
     def interleave(s0, s1, s2):
         return "".join(alphabet[v] for j in range(nb) for v in (s0[j], s1[j], s2[j]))
 
-    best = (-math.inf, None, None)  # score, perm, scalars
+    # score, perm, scalars
+    best: tuple[float, tuple[int, ...] | None, tuple[int, int, int] | None] = (
+        -math.inf,
+        None,
+        None,
+    )
     for perm in itertools.permutations(range(3)):
         for u0 in scalars_for[perm[0]]:
             s0 = smap[(perm[0], u0)][0]
@@ -253,8 +266,9 @@ def _strong(
                     if sc > best[0]:
                         best = (sc, perm, (u0, u1, u2))
 
-    _, perm, us = best
-    slots = [perm[i] for i in range(3)]  # slots[pos] = which input row feeds coordinate pos
+    _, best_perm, us = best
+    assert best_perm is not None and us is not None  # at least one permutation is scored
+    slots = [best_perm[i] for i in range(3)]  # slots[pos] = which input row feeds coordinate pos
     chans = [channels[triple[slots[pos]]] for pos in range(3)]
     offs = [list(smap[(slots[pos], us[pos])][1]) for pos in range(3)]
     streams = [_stream(chans[pos], q, us[pos], offs[pos]) for pos in range(3)]
@@ -280,7 +294,11 @@ def _strong(
                 if base_t > cur:
                     cur, improved = base_t, True
 
-    matrix = [tuple((us[pos] * x) % 26 for x in rows[slots[pos]]) for pos in range(3)]
+    matrix: list[tuple[int, int, int]] = []
+    for pos in range(3):
+        a, b, c = rows[slots[pos]]
+        u = us[pos]
+        matrix.append(((u * a) % 26, (u * b) % 26, (u * c) % 26))
     return cur, text(), matrix, offs
 
 
@@ -332,7 +350,7 @@ def recover(
             # 1) score every projective row by additive-invariant chi-square
             channels: list[list[int]] = []
             chis: list[float] = []
-            for (a, b, c) in _ROWS:
+            for a, b, c in _ROWS:
                 ch = [(a * c0[j] + b * c1[j] + c * c2[j]) % 26 for j in range(len(blocks))]
                 channels.append(ch)
                 chis.append(_row_chi(ch, q, winv))
@@ -348,7 +366,17 @@ def recover(
             cand: list[tuple[float, tuple[int, int, int]]] = []
             seen_tri: set[tuple[int, int, int]] = set()
 
-            def _cheap(ra: int, rb: int, rc: int) -> None:
+            # Bind the per-`q` mutable state as defaults so the closure captures
+            # *this* iteration's objects explicitly (avoids B023 late-binding trap).
+            def _cheap(
+                ra: int,
+                rb: int,
+                rc: int,
+                *,
+                seen_tri: set[tuple[int, int, int]] = seen_tri,
+                resolved: dict[int, tuple[float, int, list[int], list[int]]] = resolved,
+                cand: list[tuple[float, tuple[int, int, int]]] = cand,
+            ) -> None:
                 key = (ra, rb, rc)
                 if key in seen_tri:
                     return
@@ -395,16 +423,21 @@ def recover(
                 )
                 if text not in seen_text:
                     seen_text.add(text)
-                    best_here.append((sc, Recovered(
-                        plaintext=text,
-                        decrypt_matrix=matrix,
-                        alphabet=alphabet,
-                        q=q,
-                        offsets=offs,
-                        score=sc,
-                        rows_used=(rank[ra], rank[rb], rank[rc]),
-                        meta={"phase": phase},
-                    )))
+                    best_here.append(
+                        (
+                            sc,
+                            Recovered(
+                                plaintext=text,
+                                decrypt_matrix=matrix,
+                                alphabet=alphabet,
+                                q=q,
+                                offsets=offs,
+                                score=sc,
+                                rows_used=(rank[ra], rank[rb], rank[rc]),
+                                meta={"phase": phase},
+                            ),
+                        )
+                    )
                 # early exit: a confidently-English recovery is the answer
                 if scorer.confidence(text) >= stop_confidence:
                     break

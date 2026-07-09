@@ -53,8 +53,8 @@ from .quagmire2 import QuagmireII
 from .quagmire3 import QuagmireIII
 from .quagmire4 import QuagmireIV
 from .ragbaby import Ragbaby
-from .rectangular_playfair import RectangularPlayfair
 from .railfence import RailFence
+from .rectangular_playfair import RectangularPlayfair
 from .redefence import Redefence
 from .route import Route
 from .running_key import RunningKey

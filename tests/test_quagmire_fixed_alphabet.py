@@ -58,8 +58,14 @@ def test_fast_and_sweeps_periods():
     """The whole point: sweeping a wide period band is cheap (no annealing)."""
     shifts = [2, 9, 14, 3, 20, 7, 1]
     ct = _encrypt(PLAIN, KRYPTOS_ALPHABET, KRYPTOS_ALPHABET, shifts)
-    t0 = time.time()
+    # Guard against accidentally falling into the blind annealing path (orders of
+    # magnitude more work). Measure CPU time, not wall clock: this test runs in the
+    # parallel (`-n auto`) suite where sibling workers contend for cores and inflate
+    # wall time, which made a wall-clock bound flake on CI. The solve is single-
+    # threaded, so process_time() counts only its own CPU (~1.3s locally) and is
+    # immune to that contention while still tripping on a real regression.
+    t0 = time.process_time()
     r = solve_fixed_alphabet(ct, KRYPTOS_ALPHABET, kind="quagmire3", periods=range(2, 31))
     assert r["period"] == 7
     assert r["plaintext"] == PLAIN
-    assert time.time() - t0 < 5.0
+    assert time.process_time() - t0 < 10.0

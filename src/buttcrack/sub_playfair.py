@@ -119,8 +119,10 @@ def _grid_meta(grid: str) -> tuple[str | None, str | None, str]:
         return None, None, ("X" if "X" in present else "Q")
     dropped = next((c for c in _STD if c not in present), "J")
     i = _STD.index(dropped)
-    merge_target = next((_STD[(i + d) % 26] for d in (-1, 1, -2, 2) if _STD[(i + d) % 26] in present),
-                        next(iter(present)))
+    merge_target = next(
+        (_STD[(i + d) % 26] for d in (-1, 1, -2, 2) if _STD[(i + d) % 26] in present),
+        next(iter(present)),
+    )
     filler = "X" if "X" in present else next(c for c in "QZ" + _STD if c in present)
     return dropped, merge_target, filler
 
@@ -134,7 +136,9 @@ def _square_meta(square25: str) -> tuple[str, str, str]:
 def _pairs_drop_aware(letters: str, grid: str) -> list[tuple[str, str]]:
     """Even-length digraph split; folds the grid's dropped letter (if any) onto its merge-mate."""
     dropped, merge_target, _ = _grid_meta(grid)
-    s = letters if dropped is None else letters.replace(dropped, merge_target)
+    s = letters
+    if dropped is not None and merge_target is not None:  # coupled: 25-cell grid yields both
+        s = letters.replace(dropped, merge_target)
     if len(s) % 2:
         s = s[:-1]
     return [(s[i], s[i + 1]) for i in range(0, len(s), 2)]
@@ -143,7 +147,9 @@ def _pairs_drop_aware(letters: str, grid: str) -> list[tuple[str, str]]:
 def _prepare_drop_aware(letters: str, grid: str) -> list[tuple[str, str]]:
     """Encode-prepare (fold drop if any, split doubles with a present filler, pad tail)."""
     dropped, merge_target, filler = _grid_meta(grid)
-    s = letters if dropped is None else letters.replace(dropped, merge_target)
+    s = letters
+    if dropped is not None and merge_target is not None:  # coupled: 25-cell grid yields both
+        s = letters.replace(dropped, merge_target)
     fallback = merge_target or (next(c for c in _STD if c in set(grid) and c != filler))
     pairs: list[tuple[str, str]] = []
     i = 0
@@ -273,9 +279,7 @@ def recover_outer_key_over_playfair(
         if not dbanned:
             return 0.0
         v = sum(
-            1
-            for (j1, j2), diffs in dbanned.items()
-            if ((shifts[j2] - shifts[j1]) % 26) in diffs
+            1 for (j1, j2), diffs in dbanned.items() if ((shifts[j2] - shifts[j1]) % 26) in diffs
         )
         return double_penalty * v
 
