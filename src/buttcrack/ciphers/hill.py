@@ -48,8 +48,7 @@ def _parse_key(key: str) -> tuple[list[list[int]], int]:
     n = math.isqrt(len(nums))
     if n < 2 or n * n != len(nums):
         raise ValueError(
-            f"Hill key must give a square n x n matrix (n*n values, n >= 2); "
-            f"got {len(nums)} values"
+            f"Hill key must give a square n x n matrix (n*n values, n >= 2); got {len(nums)} values"
         )
     matrix = [nums[i * n : (i + 1) * n] for i in range(n)]
     return matrix, n
@@ -237,7 +236,9 @@ class Hill(Cipher):
                         checked += 1
                         # Budget check periodically rather than every matrix.
                         if deadline and checked % 4096 == 0 and time.monotonic() > deadline:
-                            return self._merge(results, self._finish(letters, text, shortlist, scorer, top), top)
+                            return self._merge(
+                                results, self._finish(letters, text, shortlist, scorer, top), top
+                            )
                         plain = _apply([[a, b], [c, d]], prefix, 2)
                         s = scorer.score(plain)
                         if len(shortlist) < keep:
@@ -313,7 +314,13 @@ class Hill(Cipher):
             key=key,
             score=r.score,
             confidence=scorer.confidence(r.plaintext),
-            meta={"n": 3, "decrypt_matrix": dec, "alphabet": r.alphabet, "q": r.q, "offsets": r.offsets},
+            meta={
+                "n": 3,
+                "decrypt_matrix": dec,
+                "alphabet": r.alphabet,
+                "q": r.q,
+                "offsets": r.offsets,
+            },
         )
 
     @staticmethod
@@ -476,9 +483,7 @@ def companion_matrix(word: str, alphabet: str = _STD_ALPHABET) -> list[list[int]
     return m
 
 
-def kronecker_matrix(
-    word_a: str, word_b: str, alphabet: str = _STD_ALPHABET
-) -> list[list[int]]:
+def kronecker_matrix(word_a: str, word_b: str, alphabet: str = _STD_ALPHABET) -> list[list[int]]:
     """Kronecker product ``M(word_a) ⊗ M(word_b)`` mod 26 for a wide Hill from two small keys.
 
     ``M(word)`` is :func:`matrix_from_word` (an ``sa x sa`` / ``sb x sb`` matrix from a

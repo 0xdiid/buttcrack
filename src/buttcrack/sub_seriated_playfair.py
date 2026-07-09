@@ -42,7 +42,7 @@ with any wrong square it plateaus in the noise.
 
 Public API
 ----------
-``sub_encode`` / ``sub_decode``                      periodic shift over a keyed alphabet (re-exported)
+``sub_encode`` / ``sub_decode``                  periodic shift over a keyed alphabet (re-exported)
 ``seriated_playfair_encode`` / ``_decode``            Seriated-Playfair inner given a 25-cell square
 ``encrypt_sub_over_seriated_playfair``                plant CT = outer(seriated_playfair(PT))
 ``recover_outer_key_over_seriated_playfair``          key-given-structure recovery (one square)
@@ -57,7 +57,6 @@ from collections.abc import Callable, Iterable, Sequence
 from itertools import product
 
 from .ciphers.seriated_playfair import _decode_to_prepared, _encode_prepared, _seriate
-from .ciphers.squares import PolybiusSquare
 from .scoring import index_of_coincidence  # noqa: F401  (handy for callers)
 from .sub_fractionation import make_objective, resolve_alphabet, sub_decode, sub_encode
 from .sub_playfair import resolve_square, square_alphabet5
@@ -226,9 +225,7 @@ def recover_outer_key_over_seriated_playfair(
         if not dbanned:
             return 0.0
         v = sum(
-            1
-            for (j1, j2), diffs in dbanned.items()
-            if ((shifts[j2] - shifts[j1]) % 26) in diffs
+            1 for (j1, j2), diffs in dbanned.items() if ((shifts[j2] - shifts[j1]) % 26) in diffs
         )
         return double_penalty * v
 

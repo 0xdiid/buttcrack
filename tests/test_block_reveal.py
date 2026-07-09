@@ -1,5 +1,6 @@
 """Block-granular (unit>1) reveal search, exact-binomial block-alignment, and transposition-key
 inversion — the trigraph-block transposition over a periodic Quagmire capabilities."""
+
 from __future__ import annotations
 
 import random
@@ -30,11 +31,15 @@ def test_reveal_enum_unit3_recovers_nondictionary_block_order():
     """A trigraph-block columnar over a Quagmire III is cracked at unit=3 and NOT at unit=1 —
     the letter-only enumeration is blind to the block geometry."""
     ct = _block_over_q3()
-    res3 = crack_columnar_reveal_enum(ct, get_scorer("quadgrams"), widths=[6], unit=3, null_samples=12)
+    res3 = crack_columnar_reveal_enum(
+        ct, get_scorer("quadgrams"), widths=[6], unit=3, null_samples=12
+    )
     assert res3["recovered"] is True
     assert res3["structure"]["columnar_order"] == _ORDER
     assert res3["structure"]["unit"] == 3
-    res1 = crack_columnar_reveal_enum(ct, get_scorer("quadgrams"), widths=[6], unit=1, null_samples=12)
+    res1 = crack_columnar_reveal_enum(
+        ct, get_scorer("quadgrams"), widths=[6], unit=1, null_samples=12
+    )
     assert res1["recovered"] is False
 
 
@@ -52,6 +57,7 @@ def test_search_aware_null_block_shuffle_is_stricter():
 
     def search(s: str) -> float:
         from buttcrack.transsub import _best_reveal_for_width
+
         return _best_reveal_for_width(s, 6, 3)
 
     letter_null = search_aware_null(ct, search, samples=12, unit=1)
@@ -73,7 +79,8 @@ def _plant(positions, gram="QZJ", n=72, seed=7):
                 s[i] = chr(65 + rng.randrange(26))
         text = "".join(s)
         from collections import Counter
-        tri = Counter(text[i:i + 3] for i in range(n - 2))
+
+        tri = Counter(text[i : i + 3] for i in range(n - 2))
         # only the planted gram may recur >=3x
         if all(g == gram or c < 3 for g, c in tri.items()) and tri[gram] == len(positions):
             return text
@@ -114,7 +121,9 @@ def test_diagnose_recommends_unit_on_block_signal():
 # ---- item 6: transposition-key inversion ----
 def test_keyword_from_order_inverts_read_order():
     order = _read_order("PALIMPSEST")
-    assert "PALIMPSEST" in keyfinder.keyword_from_order(order, ["PALIMPSEST", "KRYPTOS", "LAVENDER"])
+    assert "PALIMPSEST" in keyfinder.keyword_from_order(
+        order, ["PALIMPSEST", "KRYPTOS", "LAVENDER"]
+    )
     assert keyfinder.keyword_from_order(list(range(10)), ["PALIMPSEST"]) == []  # identity: unkeyed
 
 
@@ -129,8 +138,9 @@ def test_describe_permutation_labels_generators():
 # ---- item 2/4: the decider ranks a hypothesised true order first ----
 def test_sweep_decider_confirms_true_block_order():
     ct = _block_over_q3()
-    res = sweep_known_alphabet(ct, [_ORDER, [0, 1, 2, 3, 4, 5], [5, 4, 3, 2, 1, 0]],
-                               unit=3, periods=range(6, 9))
+    res = sweep_known_alphabet(
+        ct, [_ORDER, [0, 1, 2, 3, 4, 5], [5, 4, 3, 2, 1, 0]], unit=3, periods=range(6, 9)
+    )
     top = res["candidates"][0]
     assert top["order"] == _ORDER
     assert top["recovered"] is True

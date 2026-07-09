@@ -49,7 +49,8 @@ def test_inner_class_coset_ioc_orders_flatteners():
 
 
 def test_classify_coset_ioc_picks_digraphic_band():
-    """A digraphic-class coset IoC classifies to playfair/bifid/four_square, not language/uniform."""
+    """A digraphic-class coset IoC classifies to playfair/bifid/four_square, not
+    language/uniform."""
     from buttcrack.analysis import classify_coset_ioc
 
     hits = classify_coset_ioc(0.0536, 153, 7, samples=120, seed=1, tol=1.5)
@@ -306,7 +307,10 @@ def test_linear_channel_silent_on_flat_nonlinear(plaintext):
 
     # A FLAT non-Hill cipher must not be mistaken for a Hill: a Quagmire is monoalphabetic-per-
     # column, so its varying key scrambles any bigram structure — no polygraphic linear channel.
-    assert linear_channel(registry.get("quagmire3").encode(plaintext, "CRUCIBL/METALS"))["hit"] is False
+    assert (
+        linear_channel(registry.get("quagmire3").encode(plaintext, "CRUCIBL/METALS"))["hit"]
+        is False
+    )
 
 
 def test_linear_channel_skips_non_flat_text(plaintext):
@@ -397,7 +401,8 @@ def test_linear_channel_width_fires_at_true_block_width():
     from buttcrack.analysis import linear_channel_width
 
     # A width-3 Hill over English leaks a plaintext coordinate to the width-3 probe: the full Z26
-    # covector search finds it, so the channel IoC lifts to ~ English and the matched null is beaten.
+    # covector search finds it, so the channel IoC lifts to ~ English and the matched null is
+    # beaten.
     ct3 = _wide_hill(_WIDE_PLAIN, 3, seed=0)
     res = linear_channel_width(ct3, alphabet="STD", widths=(2, 3), null_trials=120)
     w3 = res["widths"][3]

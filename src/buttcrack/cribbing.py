@@ -34,7 +34,7 @@ returns the best-scoring consistent solution as a dict with keys
 
 from __future__ import annotations
 
-from typing import Iterable, Optional
+from collections.abc import Iterable
 
 from .scoring import get_scorer
 
@@ -72,7 +72,7 @@ def solve(
     scorer=None,
     leaf_cap: int = 3000,
     node_cap: int = 800000,
-) -> Optional[dict]:
+) -> dict | None:
     """Crib-anchor a sub-INNER complete columnar and return the best solution.
 
     Parameters
@@ -101,7 +101,7 @@ def solve(
     if not crib:
         raise ValueError("crib must be a non-empty known-plaintext prefix")
 
-    best: Optional[dict] = None
+    best: dict | None = None
     for width in widths:
         if width <= 0 or len(ct) % width:
             continue
@@ -116,8 +116,15 @@ def solve(
                     if period <= 0:
                         continue
                     for pt, sc, order in _iter_solutions(
-                        ct, crib, width, period, alphabet, variant, scorer,
-                        leaf_cap=leaf_cap, node_cap=node_cap,
+                        ct,
+                        crib,
+                        width,
+                        period,
+                        alphabet,
+                        variant,
+                        scorer,
+                        leaf_cap=leaf_cap,
+                        node_cap=node_cap,
                     ):
                         if best is None or sc > best["score"]:
                             best = {
@@ -132,9 +139,7 @@ def solve(
     return best
 
 
-def _iter_solutions(
-    ct, crib, width, period, alphabet, variant, scorer, *, leaf_cap, node_cap
-):
+def _iter_solutions(ct, crib, width, period, alphabet, variant, scorer, *, leaf_cap, node_cap):
     """Like ``_solve_one`` but also reports the recovered read-order per solution."""
     n = len(ct)
     if width <= 0 or n % width:
@@ -190,9 +195,9 @@ def _iter_solutions(
             if used_slot[slot]:
                 continue
             base = slot * H
-            newkey = {}
+            newkey: dict[int, int] = {}
             ok = True
-            for (j, r) in col_cells[c]:
+            for j, r in col_cells[c]:
                 sh = implied_shift(cti[base + r], cribi[j])
                 cls = j % period
                 cur = key.get(cls)
@@ -234,6 +239,7 @@ def _sub_encode(pt, shifts, alphabet, variant):
 
 def _self_test():
     import random
+
     from buttcrack.ciphers.columnar import _encode_letters
 
     rng = random.Random(3)
@@ -265,7 +271,7 @@ def _self_test():
         variants=("vig",),
     )
     assert res is not None, "no consistent solution found"
-    match = sum(a == b for a, b in zip(res["plaintext"], pt)) / len(pt)
+    match = sum(a == b for a, b in zip(res["plaintext"], pt, strict=False)) / len(pt)
     print(f"    recovered order = {res['order']}", flush=True)
     print(
         f"    score={res['score']:.0f} match={match:.0%} "
@@ -277,7 +283,8 @@ def _self_test():
 
     # Also confirm the full sweep (defaults) finds it among many configs.
     res2 = solve(ct, crib)
-    match2 = sum(a == b for a, b in zip(res2["plaintext"], pt)) / len(pt)
+    assert res2 is not None, "full default sweep found no consistent solution"
+    match2 = sum(a == b for a, b in zip(res2["plaintext"], pt, strict=False)) / len(pt)
     print(
         f"    [full default sweep] best score={res2['score']:.0f} match={match2:.0%} "
         f"cfg=(w{res2['width']} p{res2['period']} {res2['alphabet']}/{res2['variant']})",

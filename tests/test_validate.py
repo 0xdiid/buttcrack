@@ -72,8 +72,8 @@ def test_make_synthetic_every_structure_has_exact_length():
 
 
 def test_make_synthetic_substitution_over_columnar_decodes_back():
-    # Sub-over-columnar shape: CT = Vig(columnar(PT)). Manually invert to confirm the synthetic is the
-    # exact composition the layered solver targets.
+    # Sub-over-columnar shape: CT = Vig(columnar(PT)). Manually invert to confirm the synthetic
+    # is the exact composition the layered solver targets.
     synth = make_synthetic(
         {
             "structure": "substitution-over-columnar",
@@ -116,8 +116,8 @@ def test_positive_control_passes_real_columnar_solver():
 
 
 def test_positive_control_passes_layered_solver_on_pk4_shape():
-    # The sub-over-columnar grammar: Vigenere (KRYPTOS) OVER a single columnar. The layered solver must
-    # recover its own structure before any negative it reports is trusted.
+    # The sub-over-columnar grammar: Vigenere (KRYPTOS) OVER a single columnar. The layered
+    # solver must recover its own structure before any negative it reports is trusted.
     scorer = get_scorer()
     spec = {
         "structure": "substitution-over-columnar",

@@ -1,4 +1,5 @@
 """Tests for the transposition-OVER-substitution solver (mirror of `layered`)."""
+
 from __future__ import annotations
 
 import random
@@ -89,9 +90,7 @@ def test_enum_recovers_nondictionary_incomplete_columnar():
     inner = QuagmireIII().encode(_ENUM_PLAIN, "KRYPTOS/PORTABLE")  # 8-letter indicator
     ct = _encode_letters(inner, _ENUM_ORDER)
 
-    res = crack_columnar_reveal_enum(
-        ct, get_scorer(), widths=[6], top_orders=8, null_samples=16
-    )
+    res = crack_columnar_reveal_enum(ct, get_scorer(), widths=[6], top_orders=8, null_samples=16)
     assert res["recovered"] is True
     assert res["word_coverage"] >= 0.6
     assert res["structure"]["columnar_order"] == _ENUM_ORDER
@@ -108,9 +107,7 @@ def test_enum_null_gate_rejects_structureless_text():
     # the report even before the substitution fails to solve to English.
     rng = random.Random(11)
     junk = "".join(rng.choice("ABCDEFGHIJKLMNOPQRSTUVWXYZ") for _ in range(160))
-    res = crack_columnar_reveal_enum(
-        junk, get_scorer(), widths=[5], top_orders=2, null_samples=12
-    )
+    res = crack_columnar_reveal_enum(junk, get_scorer(), widths=[5], top_orders=2, null_samples=12)
     assert res["recovered"] is False
     assert res["reveal_null"]["verdict"] == "within null (overfit)"
 
@@ -150,13 +147,18 @@ def _encode_double(indicator: str, kw1: str, kw2: str) -> str:
 
 
 def test_double_columnar_keyword_pair_recovers_synthetic():
-    # period-13 Vigenere/KRYPTOS inner, then TELESCOPE then HURRICANE columnar (double-columnar shape).
+    # period-13 Vigenere/KRYPTOS inner, then TELESCOPE then HURRICANE columnar (double-columnar
+    # shape).
     # The directed pair sweep over a small wordlist containing the true keywords must undo
     # both layers (in the correct decrypt order) and solve the exposed substitution.
     ct = _encode_double("TELESCOPESAYS", "TELESCOPE", "HURRICANE")
     wordlist = ["TELESCOPE", "HURRICANE", "RANDOMERS", "WORKPLACE", "SCRAMBLED"]
     res = crack_double_columnar_keywords(
-        ct, get_scorer(), lengths=[9], wordlist=wordlist, period_band=range(11, 16),
+        ct,
+        get_scorer(),
+        lengths=[9],
+        wordlist=wordlist,
+        period_band=range(11, 16),
         null_samples=12,
     )
     assert res["recovered"] is True
@@ -175,8 +177,12 @@ def test_double_columnar_keyword_pair_rejects_wrong_wordlist():
     # as recovered (the reveal pre-filter never fires / the null gate vetoes).
     ct = _encode_double("TELESCOPESAYS", "TELESCOPE", "HURRICANE")
     res = crack_double_columnar_keywords(
-        ct, get_scorer(), lengths=[9], wordlist=["RANDOMERS", "WORKPLACE", "SCRAMBLED"],
-        period_band=range(11, 16), null_samples=12,
+        ct,
+        get_scorer(),
+        lengths=[9],
+        wordlist=["RANDOMERS", "WORKPLACE", "SCRAMBLED"],
+        period_band=range(11, 16),
+        null_samples=12,
     )
     assert res["recovered"] is False
 

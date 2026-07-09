@@ -1,4 +1,5 @@
-"""Tests for the block-transposition-over-periodic-substitution generalizations added to the toolkit:
+"""Tests for the block-transposition-over-periodic-substitution generalizations added to the
+toolkit:
 #1 confidence gate (validate.solve_confidence + solver result fields)
 #2 transsub.sweep_known_alphabet (calibrated known-alphabet order decider)
 #4 unit=3 block transposition threaded through transsub
@@ -81,8 +82,13 @@ def test_transsub_unit3_single_columnar_recovers():
     pt, ct = _make_block_columnar_over_sub("NEEDLEWORK", period=11)
     scorer = resolve_scorer("quadgrams")
     r = transsub.crack_transposition_over_sub(
-        ct, scorer, alphabet="KRYPTOS", layers=1, widths=[10],
-        keywords=["NEEDLEWORK"], unit=3,
+        ct,
+        scorer,
+        alphabet="KRYPTOS",
+        layers=1,
+        widths=[10],
+        keywords=["NEEDLEWORK"],
+        unit=3,
     )
     assert r["recovered"] is True
     assert only_letters(r["plaintext"]) == pt
@@ -90,9 +96,13 @@ def test_transsub_unit3_single_columnar_recovers():
 
 def test_transsub_unit_rejected_for_blind_double():
     import pytest
+
     with pytest.raises(ValueError):
         transsub.crack_transposition_over_sub(
-            ENGLISH, resolve_scorer("quadgrams"), layers=2, unit=3,
+            ENGLISH,
+            resolve_scorer("quadgrams"),
+            layers=2,
+            unit=3,
         )
 
 
@@ -108,7 +118,12 @@ def test_sweep_ranks_true_order_above_null():
         decoys.append(o)
     orders = decoys[:3] + [true_order] + decoys[3:]
     res = transsub.sweep_known_alphabet(
-        ct, orders, alphabet="KRYPTOS", unit=3, periods=range(6, 16), null_samples=12,
+        ct,
+        orders,
+        alphabet="KRYPTOS",
+        unit=3,
+        periods=range(6, 16),
+        null_samples=12,
     )
     best = res["candidates"][0]
     assert best["order"] == list(true_order)
@@ -120,6 +135,7 @@ def test_unit3_double_columnar_keywords_recovered_gate():
     """Regression for the unit=3 null fix: a genuine trigraph DOUBLE columnar over a sub must
     gate recovered=True (the search-aware null must undo at the SAME unit, not unit=1)."""
     from buttcrack.ciphers.columnar import _encode_units, _read_order
+
     kw1, kw2 = "HURRICANE", "TELESCOPE"  # both width 9
     width = 9
     n_blocks = (len(ENGLISH * 3) // (3 * width)) * width
@@ -129,8 +145,14 @@ def test_unit3_double_columnar_keywords_recovered_gate():
     # encrypt applies inner o2 then outer o1; the cracker undoes o1 then o2
     ct = _encode_units(_encode_units(S, _read_order(kw2), unit=3), _read_order(kw1), unit=3)
     r = transsub.crack_double_columnar_keywords(
-        ct, resolve_scorer("quadgrams"), lengths=[9], wordlist=[kw1, kw2],
-        alphabet="KRYPTOS", period_band=range(9, 14), null_samples=10, unit=3,
+        ct,
+        resolve_scorer("quadgrams"),
+        lengths=[9],
+        wordlist=[kw1, kw2],
+        alphabet="KRYPTOS",
+        period_band=range(9, 14),
+        null_samples=10,
+        unit=3,
     )
     assert r["recovered"] is True
     assert only_letters(r["plaintext"]) == pt

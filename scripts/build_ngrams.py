@@ -27,8 +27,14 @@ import unicodedata
 from collections import Counter
 from pathlib import Path
 
-NGRAMS = {1: "monograms", 2: "bigrams", 3: "trigrams", 4: "quadgrams",
-          5: "quintgrams", 6: "hexagrams"}
+NGRAMS = {
+    1: "monograms",
+    2: "bigrams",
+    3: "trigrams",
+    4: "quadgrams",
+    5: "quintgrams",
+    6: "hexagrams",
+}
 
 # Drop n-grams seen fewer than this many times, to keep file sizes sane. Unseen
 # n-grams are floored by the scorer anyway, so pruning the long rare tail is safe.

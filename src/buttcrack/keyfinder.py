@@ -177,8 +177,8 @@ def keyword_from_order(order, wordlist, *, tie: str = "stable") -> list[str]:
 def describe_permutation(perm) -> list[str]:
     """Label a permutation with the human, *recognisable* generator(s) that produce it.
 
-    A recognisable-permutation wall is a low-entropy, human-recognisable permutation that resists blind
-    n-gram search (flat gradient) yet is not a dictionary keyword. This checks a recovered
+    A recognisable-permutation wall is a low-entropy, human-recognisable permutation that resists
+    blind n-gram search (flat gradient) yet is not a dictionary keyword. This checks a recovered
     read-order against named non-keyword generators — identity, reversal, rotation, odd/even
     interleave, and the out-faro (riffle) shuffle — so a recovered transposition can
     self-report "this is a reverse" / "rotate-3" instead of reading as random noise. The
@@ -213,7 +213,7 @@ def describe_permutation(perm) -> list[str]:
     half = (n + 1) // 2
     top, bot = list(range(half)), list(range(half, n))
     riffle: list[int] = []
-    for a, b in zip(top, bot):
+    for a, b in zip(top, bot, strict=False):
         riffle += [a, b]
     if len(top) > len(bot):
         riffle.append(top[-1])

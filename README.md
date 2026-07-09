@@ -140,12 +140,17 @@ Errors never dump a traceback. With `--json` they return `{"ok": false, "error":
 | `butt crack <cipher> [text]` | Crack a specific cipher, keyless (`--crib WORD` to confirm/rank) |
 | `butt auto [text]` | Identify and crack across all ciphers, ranked (`--crib WORD` also unlocks the crib-anchored keyed-substitution-over-columnar crack) |
 | `butt crib --crib WORD [text]` | Crib-drag a guessed word across the Vigenère family / running key |
+| `butt keysource [ct] --corpus … / --compose A B / --decompose K` | Candidate keys from prior-solution texts (running key/acrostic/word), two-word composed keys, and a one-shot running-key screen against a target ciphertext |
+| `butt hillkpa [ct] --crib WORD [-n N]` | Hill known-plaintext attack: recover the n×n key from a crib (keyed alphabet, CRT over Z26) |
+| `butt validate --structure S [--self-check]` | Build a same-structure synthetic ciphertext (validate-on-synthetic discipline) and optionally prove `butt auto` recovers it |
 | `butt transform [text] [--decimate P:O]` | Un-wrap format tricks: reverse, base64/hex/A1Z26, strip nulls |
 | `butt pipeline [text] --step cipher:key …` | Chain decode (or `--encode`) steps for a layered cipher |
 | `butt layered [text] --period P` | Crack a periodic (Quagmire) substitution **over** a columnar transposition; emits a per-column residual report for an agent when columns are too short to decide |
 | `butt identify [text] [--types]` | Classify likely cipher family, or specific types (`--types`) |
 | `butt diagnose [text]` | One-shot layered/composite structure triage → verdict + recommended attacks |
-| `butt stats [text] [--contacts]` | Frequency / IoC / per-letter chi-squared / digraph / Kasiski / period & repeated-bigram detectors (+ vowel-finder) |
+| `butt stats [text] [--contacts] [--significance] [--family]` | Frequency / IoC / per-letter chi-squared / digraph / Kasiski / period & repeated-bigram detectors (+ vowel-finder); `--family` adds the look-elsewhere-corrected significance of the strongest period |
+| `butt compare [ct_a] --with ct_b` | Sibling-pair analysis: do two ciphertexts share a construction? (frequency profile, period/kappa signature, additive superimposition) |
+| `butt nonprose [text]` | Flag a candidate that scores like English but reads as a route/coordinates/list (structured non-prose payload) |
 | `butt keyword [text]` | Recover the keyword from a keyed alphabet or square |
 | `butt words {match,pattern,anagram,ngram} <q>` | Dictionary search |
 | `butt convert [text] --to {numbers,pairs,letters}` | A1Z26 conversion |

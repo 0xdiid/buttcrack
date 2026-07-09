@@ -13,6 +13,7 @@ import math
 import random
 from collections import Counter
 from collections.abc import Callable, Sequence
+from typing import cast
 
 from .keysources import _alphabet
 from .scoring import (
@@ -26,7 +27,7 @@ from .text import only_letters
 try:  # optional acceleration only; the package itself stays dependency-free
     import numpy as _np
 except Exception:  # pragma: no cover - numpy is present in dev/test
-    _np = None
+    _np = None  # type: ignore[assignment]  # optional-dependency fallback sentinel
 
 _UNITS26 = tuple(u for u in range(26) if math.gcd(u, 26) == 1)
 
@@ -118,9 +119,13 @@ def block_transposition_signal(
         z = (aligned - exp) / math.sqrt(var) if var > 0 else 0.0
         p_raw = _binom_tail(kk, aligned, 1.0 / b) if kk else 1.0
         alignment[b] = {
-            "aligned": aligned, "residue": residue, "total": kk,
-            "expected": round(exp, 2), "z": round(z, 2),
-            "p": round(p_raw, 6), "p_corrected": round(min(1.0, p_raw * ntests), 6),
+            "aligned": aligned,
+            "residue": residue,
+            "total": kk,
+            "expected": round(exp, 2),
+            "z": round(z, 2),
+            "p": round(p_raw, 6),
+            "p_corrected": round(min(1.0, p_raw * ntests), 6),
         }
         # Require the reliable set to FULLY share a residue (aligned == kk) and clear an exact
         # significance bar; prefer the LARGEST such block (a genuine block-of-b aligns at b and
@@ -153,9 +158,7 @@ def block_transposition_signal(
         )
     return {
         "ngram": ngram,
-        "repeated_ngrams": [
-            {"gram": g, "count": len(p), "positions": p} for g, p in repeats[:12]
-        ],
+        "repeated_ngrams": [{"gram": g, "count": len(p), "positions": p} for g, p in repeats[:12]],
         "occurrences": k,
         "alignment": alignment,
         "best_block": best_block,
@@ -412,8 +415,12 @@ def superimposition_periods(
         mu = sum(base) / len(base)
         sd = (sum((b - mu) ** 2 for b in base) / len(base)) ** 0.5 or 1e-9
         out.append(
-            {"period": p, "merged_ioc": round(obs, 4), "baseline": round(mu, 4),
-             "z": round((obs - mu) / sd, 2)}
+            {
+                "period": p,
+                "merged_ioc": round(obs, 4),
+                "baseline": round(mu, 4),
+                "z": round((obs - mu) / sd, 2),
+            }
         )
     out.sort(key=lambda r: r["z"], reverse=True)
     return out[:top]
@@ -480,9 +487,10 @@ def period_inner_content(
     reliable = mu < floor + 0.010 and letters_per_col >= 12
     if not reliable:
         verdict = (
-            f"period-{period} coset IoC {coset:.4f} but only ~{letters_per_col:.0f} letters/column: "
-            f"too few to judge the inner content (random itself sits at {mu:.4f} here). Re-check the "
-            f"FUNDAMENTAL period (a smaller divisor with >=12 letters/column) instead."
+            f"period-{period} coset IoC {coset:.4f} but only ~{letters_per_col:.0f} "
+            f"letters/column: too few to judge the inner content (random itself sits at {mu:.4f} "
+            "here). Re-check the FUNDAMENTAL period (a smaller divisor with >=12 letters/column) "
+            "instead."
         )
     elif z < 2.0:
         verdict = (
@@ -498,9 +506,10 @@ def period_inner_content(
     else:
         verdict = (
             f"FLATTENED inner: coset IoC {coset:.4f} is real (z={z:.1f}) but well below English "
-            f"{english_ioc:.4f} ({gap*100:.0f}% of the way to random). The text under the period-"
-            f"{period} layer is NOT a simple language — a plain Vigenere/Quagmire peel will not read. "
-            f"Expect a polygraphic/digraphic inner (Playfair/Hill/fractionation) or a non-prose payload."
+            f"{english_ioc:.4f} ({gap * 100:.0f}% of the way to random). The text under the "
+            f"period-{period} layer is NOT a simple language — a plain Vigenere/Quagmire peel will "
+            "not read. Expect a polygraphic/digraphic inner (Playfair/Hill/fractionation) or a "
+            "non-prose payload."
         )
     return {
         "period": period,
@@ -585,7 +594,7 @@ def inner_class_coset_ioc(
     from .ciphers.bifid import bifid_encode
     from .ciphers.playfair import Playfair
     from .scoring import get_scorer
-    from .sub_four_square import four_square_encode, fs_alphabet, fs_grid
+    from .sub_four_square import four_square_encode, fs_alphabet
 
     bp = period if bifid_period is None else bifid_period
     if language == "english":
@@ -595,7 +604,7 @@ def inner_class_coset_ioc(
         freqs = {chr(65 + i): 0.0 for i in range(26)}
         for g, lp in sc.log_probs.items():
             if len(g) == 1 and "A" <= g <= "Z":
-                freqs[g] = 10 ** lp
+                freqs[g] = 10**lp
         for k, v in list(freqs.items()):
             if v <= 0:
                 freqs[k] = 1e-4
@@ -625,8 +634,9 @@ def inner_class_coset_ioc(
                 text = bifid_encode(src.replace("J", "I"), _rand_square(rng, "J"), bp)
             elif cls == "four_square":
                 a25 = fs_alphabet("Q")
-                text = four_square_encode(src.replace("Q", ""), _rand_square(rng, "Q"),
-                                          _rand_square(rng, "Q"), a25)
+                text = four_square_encode(
+                    src.replace("Q", ""), _rand_square(rng, "Q"), _rand_square(rng, "Q"), a25
+                )
             elif cls == "hill2":
                 text = _hill2_encode(src, rng)
             else:
@@ -646,7 +656,7 @@ def classify_coset_ioc(
     *,
     tol: float = 1.5,
     **kwargs,
-) -> list[dict[str, float]]:
+) -> list[dict[str, object]]:
     """Rank inner-cipher classes by how well their calibrated coset IoC matches ``observed``.
 
     Runs :func:`inner_class_coset_ioc` and returns, best-first, the classes within ``tol``
@@ -655,17 +665,17 @@ def classify_coset_ioc(
     (``samples``, ``language``, ``corpus``, ``bifid_period``, ``seed``, ``classes``).
     """
     cal = inner_class_coset_ioc(n, period, **kwargs)
-    rows = []
+    rows: list[dict[str, object]] = []
     for cls, st in cal.items():
         sd = st["sd"] or 1e-9
         z = (observed - st["mean"]) / sd
         if abs(z) <= tol:
             rows.append({"class": cls, "mean": st["mean"], "sd": st["sd"], "z": round(z, 2)})
-    rows.sort(key=lambda r: abs(r["z"]))
+    rows.sort(key=lambda r: abs(cast(float, r["z"])))
     return rows
 
 
-@functools.lru_cache(maxsize=None)
+@functools.cache
 def _projective_surjective_covectors(k: int) -> tuple[tuple[int, ...], ...]:
     """One representative per projective class of *surjective* k-covectors mod 26.
 
@@ -807,34 +817,38 @@ def linear_channel(
     best = channels[0]
     reliable = best["blocks"] >= 50
     hit = best["z"] <= -4.0
-    loc = f"block {best['block']} {best['reading']} (entropy {best['min_entropy']} vs null {best['null_mean']}, z={best['z']})"
+    loc = (
+        f"block {best['block']} {best['reading']} (entropy {best['min_entropy']} vs null "
+        f"{best['null_mean']}, z={best['z']})"
+    )
     if best["z"] <= -8.0:
         verdict = (
-            f"STRONG linear channel — a HILL cipher: {loc}. Recover it with `butt crack hill`; if it "
-            f"sits under a periodic/transposition layer, peel that first. (Alphabet-sensitive — a keyed "
-            f"Hill needs its alphabet passed in.)"
+            f"STRONG linear channel — a HILL cipher: {loc}. Recover it with `butt crack hill`; if "
+            "it sits under a periodic/transposition layer, peel that first. (Alphabet-sensitive — "
+            "a keyed Hill needs its alphabet passed in.)"
         )
     elif hit:
         verdict = (
             f"moderate linear channel — likely a HILL: {loc}. At short length a partially-linear "
-            f"digraphic (Playfair, whose same-row/col cases are shifts) can also reach this, so confirm "
-            f"with `butt crack hill`."
+            "digraphic (Playfair, whose same-row/col cases are shifts) can also reach this, so "
+            "confirm with `butt crack hill`."
         )
     elif reliable:
         verdict = (
             f"no linear channel (best z={best['z']}): NOT a Hill of a structured source in this "
-            "alphabet. A polygraphic inner here would be NONLINEAR (Playfair/two-/four-square), or the "
-            "cipher is not polygraphic. (A keyed-alphabet Hill needs its alphabet passed in.)"
+            "alphabet. A polygraphic inner here would be NONLINEAR (Playfair/two-/four-square), "
+            "or the cipher is not polygraphic. (A keyed-alphabet Hill needs its alphabet passed "
+            "in.)"
         )
     else:
         verdict = (
-            f"inconclusive: only {best['blocks']} blocks (<50) — the covector multiple-testing floor "
-            "approaches the signal at this length, so a null result cannot rule a Hill out."
+            f"inconclusive: only {best['blocks']} blocks (<50) — the covector multiple-testing "
+            "floor approaches the signal at this length, so a null result cannot rule a Hill out."
         )
     return {"reliable": reliable, "hit": hit, "channels": channels, "verdict": verdict}
 
 
-@functools.lru_cache(maxsize=None)
+@functools.cache
 def _bounded_surjective_covectors(
     w: int, coeffs: tuple[int, ...], cap: int, seed: int
 ) -> tuple[tuple[int, ...], ...]:
@@ -906,7 +920,9 @@ def _width_covectors(
     return _bounded_surjective_covectors(w, coeffs, max_functionals, seed)
 
 
-def _channel_best_ioc(indices: list[int], w: int, cov: tuple[tuple[int, ...], ...]) -> tuple[float, int]:
+def _channel_best_ioc(
+    indices: list[int], w: int, cov: tuple[tuple[int, ...], ...]
+) -> tuple[float, int]:
     """Max index-of-coincidence of the per-block value stream ``v . block`` over covectors ``v``.
 
     Returns ``(best_ioc, best_covector_index)``. The per-block value stream of the most
@@ -1038,8 +1054,14 @@ def linear_channel_width(
         exhaustive = 26**w <= enum_cap
         if nb < min_blocks:
             per_width[w] = {
-                "width": w, "blocks": nb, "hit": False, "reliable": False,
-                "search_exhaustive": exhaustive, "ioc": None, "z": None, "p": None,
+                "width": w,
+                "blocks": nb,
+                "hit": False,
+                "reliable": False,
+                "search_exhaustive": exhaustive,
+                "ioc": None,
+                "z": None,
+                "p": None,
                 "note": f"too few blocks ({nb} < {min_blocks}) for a width-{w} probe",
             }
             continue
@@ -1066,9 +1088,9 @@ def linear_channel_width(
         else:
             note = (
                 f"INCONCLUSIVE at width {w}: the covector space (26^{w}) is far larger than the "
-                f"{len(cov)} functionals searched, so the leaked coordinate was likely never tried — "
-                f"a null result CANNOT rule out a width-{w} Hill (this is the blind spot that "
-                f"mis-reads a wide Hill as 'nonlinear')"
+                f"{len(cov)} functionals searched, so the leaked coordinate was likely never tried "
+                f"— a null result CANNOT rule out a width-{w} Hill (this is the blind spot that "
+                "mis-reads a wide Hill as 'nonlinear')"
             )
         per_width[w] = {
             "width": w,
@@ -1090,11 +1112,13 @@ def linear_channel_width(
     best_width = max(hits, key=lambda d: d["z"])["width"] if hits else None
     if best_width is not None:
         verdict = (
-            f"LINEAR channel at block width {best_width} (z={per_width[best_width]['z']}): a HILL — "
-            f"recover it with `butt crack hill`. A mismatched-width probe is blind to it."
+            f"LINEAR channel at block width {best_width} (z={per_width[best_width]['z']}): a HILL "
+            "— recover it with `butt crack hill`. A mismatched-width probe is blind to it."
         )
     else:
-        underpowered = [w for w, d in per_width.items() if not d.get("search_exhaustive") and d.get("reliable")]
+        underpowered = [
+            w for w, d in per_width.items() if not d.get("search_exhaustive") and d.get("reliable")
+        ]
         if underpowered:
             verdict = (
                 f"no linear channel at exhaustively-searched widths; widths {underpowered} are "
@@ -1139,10 +1163,7 @@ def ioc_decay(
     seg_len = n // segments
 
     def slope(seq: str) -> float:
-        vals = [
-            index_of_coincidence(seq[i * seg_len : (i + 1) * seg_len])
-            for i in range(segments)
-        ]
+        vals = [index_of_coincidence(seq[i * seg_len : (i + 1) * seg_len]) for i in range(segments)]
         xbar = (segments - 1) / 2
         ybar = sum(vals) / segments
         den = sum((i - xbar) ** 2 for i in range(segments))
@@ -1245,13 +1266,11 @@ def crackability_cliff(letters: str, period: int) -> dict:
         verdict = f"recoverable: {round(cycles, 2)} cycles give each alphabet enough letters"
     elif cycles >= 1.5:
         verdict = (
-            f"marginal: only {round(cycles, 2)} cycles — blind recovery unreliable, "
-            "a crib helps"
+            f"marginal: only {round(cycles, 2)} cycles — blind recovery unreliable, a crib helps"
         )
     else:
         verdict = (
-            f"OTP-grade: {round(cycles, 2)} cycles — keystream barely repeats, "
-            "needs a crib/opening"
+            f"OTP-grade: {round(cycles, 2)} cycles — keystream barely repeats, needs a crib/opening"
         )
     return {
         "effective_period": period,
@@ -1348,8 +1367,7 @@ def decay_fingerprint(letters: str) -> list[dict]:
     drop = norm[0] - min(norm)
     if best["family"] == "stationary" or drop < 0.15:
         verdict = (
-            "no evolving family matches: likely periodic substitution "
-            "or transposition artifact"
+            "no evolving family matches: likely periodic substitution or transposition artifact"
         )
     else:
         verdict = f"best shape match: {best['family']} (distance {best['curve_distance']})"
@@ -1410,6 +1428,107 @@ def search_aware_null(
     }
 
 
+def _kappa_at(lett: list[int], lag: int) -> float:
+    """Repeat rate at ``lag`` (x26; random ~1.0)."""
+    n = len(lett)
+    if n <= lag:
+        return 0.0
+    hits = sum(1 for i in range(n - lag) if lett[i] == lett[i + lag])
+    return hits / (n - lag) * 26.0
+
+
+#: named per-period statistics for :func:`period_family_significance`
+_PERIOD_STAT_FNS = {
+    "coset_ioc": _mean_col_ioc,
+    "merged_ioc": _merge_ioc,
+    "kappa": _kappa_at,
+}
+
+
+def period_family_significance(
+    letters: str,
+    *,
+    statistic: str = "coset_ioc",
+    max_period: int | None = None,
+    min_col: int = 4,
+    samples: int = 200,
+    seed: int = 20250615,
+) -> dict:
+    """Look-elsewhere (family-wide) significance of the single strongest period in a scan.
+
+    A per-period z (:func:`calibrated_periods`, :func:`kappa_spectrum`) is calibrated against
+    *that one period's* baseline — but the scan keeps the best of many periods, and that maximum
+    is inflated by selection bias exactly like any best-of-search statistic (see
+    :func:`search_aware_null`). A per-period ``z`` of +3 across a 15- or 50-period grid is often
+    multiplicity noise, not structure. This reports the honest family-wide significance: the best
+    period's statistic vs the distribution of the *max over the same period grid* on shuffles of
+    the same letters.
+
+    ``statistic`` is ``"coset_ioc"`` (mean per-column IoC), ``"merged_ioc"`` (greedy
+    superimposition), or ``"kappa"`` (repeat rate at the lag). Returns ``{best_period, observed,
+    null_mean, null_max, z, family_p, beats_null_max, grid, samples}`` where ``family_p`` is the
+    add-one-smoothed fraction of shuffles whose grid-max reaches ``observed`` (the corrected
+    p-value). Treat the period as real only when it clears the family null (``beats_null_max`` /
+    small ``family_p``), NOT merely a high per-period z.
+    """
+    stat = _PERIOD_STAT_FNS.get(statistic)
+    if stat is None:
+        raise ValueError(f"unknown statistic {statistic!r}; use coset_ioc/merged_ioc/kappa")
+    lett = [ord(ch) - 65 for ch in only_letters(letters)]
+    n = len(lett)
+    if max_period is None:
+        max_period = min(n // min_col, 50)
+    grid = list(range(2, max_period + 1))
+    if n < 12 or not grid:
+        return {
+            "statistic": statistic,
+            "best_period": None,
+            "observed": 0.0,
+            "null_mean": 0.0,
+            "null_max": 0.0,
+            "z": 0.0,
+            "family_p": 1.0,
+            "beats_null_max": False,
+            "grid": None,
+            "samples": 0,
+        }
+    # Per-period statistics are NOT comparable across periods (raw coset-IoC rises as the
+    # columns shrink), so calibrate each period against its OWN shuffle baseline first, then
+    # family-correct the MAX calibrated z across the grid.
+    obs_raw = [stat(lett, p) for p in grid]
+    rng = random.Random(seed)
+    pool = lett[:]
+    shuffles = []
+    for _ in range(samples):
+        rng.shuffle(pool)
+        shuffles.append([stat(pool, p) for p in grid])
+    cols = list(zip(*shuffles, strict=True))  # one column of shuffle stats per period
+    mus = [sum(c) / samples for c in cols]
+    sds = [
+        (sum((v - m) ** 2 for v in c) / samples) ** 0.5 or 1e-9
+        for c, m in zip(cols, mus, strict=True)
+    ]
+
+    z_obs = [(obs_raw[i] - mus[i]) / sds[i] for i in range(len(grid))]
+    best_i = max(range(len(grid)), key=lambda i: z_obs[i])
+    observed_z = z_obs[best_i]
+    null_maxz = [max((row[i] - mus[i]) / sds[i] for i in range(len(grid))) for row in shuffles]
+    grid_maxz = max(null_maxz)
+    ge = sum(1 for v in null_maxz if v >= observed_z)
+    return {
+        "statistic": statistic,
+        "best_period": grid[best_i],
+        "observed": round(obs_raw[best_i], 4),
+        "z": round(observed_z, 2),
+        "family_null_mean_z": round(sum(null_maxz) / samples, 2),
+        "family_null_max_z": round(grid_maxz, 2),
+        "family_p": round((ge + 1) / (samples + 1), 4),
+        "beats_null_max": observed_z > grid_maxz,
+        "grid": [grid[0], grid[-1]],
+        "samples": samples,
+    }
+
+
 def _digraph_ioc(letters: str) -> float:
     """Index of coincidence over adjacent letter pairs (random ~1/676 = 0.00148)."""
     n = len(letters) - 1
@@ -1419,8 +1538,9 @@ def _digraph_ioc(letters: str) -> float:
     return sum(v * (v - 1) for v in counts.values()) / (n * (n - 1))
 
 
-def repeat_adjusted_stats(text: str, *, ngram: int = 3, min_count: int = 3, samples: int = 200,
-                          seed: int = 20250615) -> dict:
+def repeat_adjusted_stats(
+    text: str, *, ngram: int = 3, min_count: int = 3, samples: int = 200, seed: int = 20250615
+) -> dict:
     """Is the digraph structure *real*, or just a handful of exact repeats?
 
     A few exactly-repeated n-grams (a deterministic block cipher's identical blocks, a
@@ -1441,7 +1561,7 @@ def repeat_adjusted_stats(text: str, *, ngram: int = 3, min_count: int = 3, samp
         occ.setdefault(letters[i : i + ngram], []).append(i)
     repeats = {g: pos for g, pos in occ.items() if len(pos) >= min_count}
 
-    drop = set()
+    drop: set[int] = set()
     for positions in repeats.values():
         for p in positions[1:]:  # keep the first occurrence; excise the rest
             drop.update(range(p, p + ngram))
@@ -1464,15 +1584,18 @@ def repeat_adjusted_stats(text: str, *, ngram: int = 3, min_count: int = 3, samp
     survives = z >= 2.5
     return {
         "ngram": ngram,
-        "repeated_ngrams": [{"gram": g, "count": len(p)} for g, p in
-                            sorted(repeats.items(), key=lambda kv: -len(kv[1]))],
+        "repeated_ngrams": [
+            {"gram": g, "count": len(p)}
+            for g, p in sorted(repeats.items(), key=lambda kv: -len(kv[1]))
+        ],
         "digraph_ioc_full": round(full_dig, 6),
         "digraph_ioc_excised": round(exc_dig, 6),
         "digraph_ratio_full": round(full_dig / floor, 2),
         "digraph_ratio_excised": round(exc_dig / floor, 2),
         "excised_z_vs_shuffle": round(z, 2),
         "verdict": (
-            "diffuse digraph structure is real (survives excision)" if survives
+            "diffuse digraph structure is real (survives excision)"
+            if survives
             else "digraph elevation was the repeats only (collapses to random when excised)"
         ),
     }
@@ -1509,7 +1632,7 @@ def family_baseline(target: str, corpus, *, labels=None) -> dict:
     else:
         corpus = list(corpus)
         labs = labels if labels is not None else [f"#{i}" for i in range(len(corpus))]
-        items = list(zip(labs, corpus))
+        items = list(zip(labs, corpus, strict=False))
     sib = [(lab, _fingerprint(only_letters(c))) for lab, c in items]
     tgt = _fingerprint(only_letters(target))
 
@@ -1519,7 +1642,10 @@ def family_baseline(target: str, corpus, *, labels=None) -> dict:
 
     # closest sibling by normalised feature distance (ioc dominates; scaled to ~unit)
     def dist(f):
-        return ((tgt["ioc"] - f["ioc"]) / 0.01) ** 2 + ((tgt["digraph_ratio"] - f["digraph_ratio"]) / 1.0) ** 2
+        return ((tgt["ioc"] - f["ioc"]) / 0.01) ** 2 + (
+            (tgt["digraph_ratio"] - f["digraph_ratio"]) / 1.0
+        ) ** 2
+
     closest = min(sib, key=lambda lf: dist(lf[1])) if sib else (None, None)
 
     return {
@@ -1532,8 +1658,11 @@ def family_baseline(target: str, corpus, *, labels=None) -> dict:
         "verdict": (
             f"IoC {tgt['ioc']} is FAMILY-NORMAL (band {round(lo, 4)}-{round(hi, 4)}); "
             "flatness is not evidence of an exotic construction"
-            if in_band else
-            f"IoC {tgt['ioc']} is OUTSIDE the family band {round(lo, 4)}-{round(hi, 4)}: genuinely anomalous"
+            if in_band
+            else (
+                f"IoC {tgt['ioc']} is OUTSIDE the family band {round(lo, 4)}-{round(hi, 4)}: "
+                "genuinely anomalous"
+            )
         ),
     }
 
@@ -1572,8 +1701,9 @@ def _column_twist(col: list[int]) -> float:
     return (sum(pct[13:]) - sum(pct[:13])) * 100.0
 
 
-def twist_periods(letters, *, alphabet="STANDARD", max_period=None, samples=80,
-                  seed=20250615, top=6):
+def twist_periods(
+    letters, *, alphabet="STANDARD", max_period=None, samples=80, seed=20250615, top=6
+):
     """Key-length candidates by the Twist+ test — robust at short lengths.
 
     For each period the mean per-column twist is z-scored against the same statistic on shuffles
@@ -1598,14 +1728,19 @@ def twist_periods(letters, *, alphabet="STANDARD", max_period=None, samples=80,
         base = [sum(_column_twist(s[j::p]) for j in range(p)) / p for s in pool]
         mu = sum(base) / len(base)
         sd = (sum((b - mu) ** 2 for b in base) / len(base)) ** 0.5 or 1e-9
-        out.append({"period": p, "twist": round(obs, 2), "baseline": round(mu, 2),
-                    "z": round((obs - mu) / sd, 2)})
+        out.append(
+            {
+                "period": p,
+                "twist": round(obs, 2),
+                "baseline": round(mu, 2),
+                "z": round((obs - mu) / sd, 2),
+            }
+        )
     out.sort(key=lambda r: r["z"], reverse=True)
     return out[:top]
 
 
-def spectral_periods(letters, *, max_period=None, max_lag=None, samples=60,
-                     seed=20250615, top=6):
+def spectral_periods(letters, *, max_period=None, max_lag=None, samples=60, seed=20250615, top=6):
     """Periods from the coincidence-autocorrelation comb — an independent lens from IoC/Kasiski.
 
     Builds kappa(lag) = coincidence rate at each lag; a period-p cipher makes it spike at *every*
@@ -1639,8 +1774,14 @@ def spectral_periods(letters, *, max_period=None, max_lag=None, samples=60,
         base = [comb(s, p) for s in pool]
         mu = sum(base) / len(base)
         sd = (sum((b - mu) ** 2 for b in base) / len(base)) ** 0.5 or 1e-9
-        out.append({"period": p, "comb_kappa": round(obs, 4), "baseline": round(mu, 4),
-                    "z": round((obs - mu) / sd, 2)})
+        out.append(
+            {
+                "period": p,
+                "comb_kappa": round(obs, 4),
+                "baseline": round(mu, 4),
+                "z": round((obs - mu) / sd, 2),
+            }
+        )
     out.sort(key=lambda r: r["z"], reverse=True)
     return out[:top]
 
@@ -1687,8 +1828,14 @@ def mutual_kappa_scan(a, b, *, max_shift=None, min_overlap=20, top=6):
             continue
         kappa = sum(1 for i in range(lo, hi) if ai[i] == bi[i - shift]) / overlap
         sd = (mic * (1 - mic) / overlap) ** 0.5 or 1e-9
-        out.append({"shift": shift, "overlap": overlap, "kappa": round(kappa, 4),
-                    "z": round((kappa - mic) / sd, 2)})
+        out.append(
+            {
+                "shift": shift,
+                "overlap": overlap,
+                "kappa": round(kappa, 4),
+                "z": round((kappa - mic) / sd, 2),
+            }
+        )
     out.sort(key=lambda r: r["z"], reverse=True)
     return out[:top]
 
@@ -1701,7 +1848,7 @@ def trigraphic_ioc(letters, *, step=1):
     DIC/EDI for the fractionation family.
     """
     letters = only_letters(letters)
-    grams = [letters[i:i + 3] for i in range(0, len(letters) - 2, step)]
+    grams = [letters[i : i + 3] for i in range(0, len(letters) - 2, step)]
     m = len(grams)
     if m < 2:
         return 0.0
@@ -1720,11 +1867,15 @@ def conditional_entropy(letters):
     letters = only_letters(letters)
     n = len(letters)
     if n < 3:
-        return {"monogram_entropy": None, "bigram_entropy": None,
-                "conditional_entropy": None, "redundancy": None}
+        return {
+            "monogram_entropy": None,
+            "bigram_entropy": None,
+            "conditional_entropy": None,
+            "redundancy": None,
+        }
     h1 = letter_entropy(letters)
     nb = n - 1
-    bi = Counter(letters[i:i + 2] for i in range(nb))
+    bi = Counter(letters[i : i + 2] for i in range(nb))
     first = Counter(letters[i] for i in range(nb))
     hjoint = -sum((c / nb) * math.log2(c / nb) for c in bi.values())
     hfirst = -sum((c / nb) * math.log2(c / nb) for c in first.values())
@@ -1753,10 +1904,10 @@ def hamming_periods(letters, *, max_period=None, samples=60, seed=20250615, top=
         max_period = min(n // 4, 30)
 
     def mean_norm_hamming(s, L, max_blocks=30):
-        blocks = [s[i:i + L] for i in range(0, n - L + 1, L)][:max_blocks]
+        blocks = [s[i : i + L] for i in range(0, n - L + 1, L)][:max_blocks]
         if len(blocks) < 2:
             return None
-        tot = cnt = 0
+        tot, cnt = 0.0, 0
         for x in range(len(blocks)):  # all pairs — far less noisy than consecutive-only
             for y in range(x + 1, len(blocks)):
                 b1, b2 = blocks[x], blocks[y]
@@ -1777,8 +1928,14 @@ def hamming_periods(letters, *, max_period=None, samples=60, seed=20250615, top=
         base = [v for v in (mean_norm_hamming(s, L) for s in pool) if v is not None]
         mu = sum(base) / len(base)
         sd = (sum((b - mu) ** 2 for b in base) / len(base)) ** 0.5 or 1e-9
-        out.append({"period": L, "norm_hamming": round(obs, 4), "baseline": round(mu, 4),
-                    "z": round((mu - obs) / sd, 2)})  # a dip below the null -> positive z
+        out.append(
+            {
+                "period": L,
+                "norm_hamming": round(obs, 4),
+                "baseline": round(mu, 4),
+                "z": round((mu - obs) / sd, 2),
+            }
+        )  # a dip below the null -> positive z
     out.sort(key=lambda r: r["z"], reverse=True)
     return out[:top]
 
@@ -1819,7 +1976,7 @@ def sukhotin_vowels(letters):
 
 def _profile_r(counts_sorted_desc: list[float], ref: list[float]) -> float:
     mo, mr = sum(counts_sorted_desc) / 26, sum(ref) / 26
-    cov = sum((o - mo) * (r - mr) for o, r in zip(counts_sorted_desc, ref))
+    cov = sum((o - mo) * (r - mr) for o, r in zip(counts_sorted_desc, ref, strict=False))
     so = sum((o - mo) ** 2 for o in counts_sorted_desc) ** 0.5
     sr = sum((r - mr) ** 2 for r in ref) ** 0.5
     return cov / (so * sr) if so and sr else 0.0
@@ -1840,7 +1997,9 @@ def frequency_profile_match(letters, *, samples=200, seed=20250615):
         return {"r": None, "z": None}
     ref = sorted(ENGLISH_MONOGRAM_FREQ.values(), reverse=True)
     counts = Counter(letters)
-    obs_r = _profile_r(sorted((counts.get(c, 0) / n for c in ENGLISH_MONOGRAM_FREQ), reverse=True), ref)
+    obs_r = _profile_r(
+        sorted((counts.get(c, 0) / n for c in ENGLISH_MONOGRAM_FREQ), reverse=True), ref
+    )
     rng = random.Random(seed)
     null = []
     for _ in range(samples):
@@ -1883,7 +2042,7 @@ def runs_test(letters):
     runs = 1 + sum(1 for i in range(1, m) if signs[i] != signs[i - 1])
     mu = 1 + 2 * n1 * n0 / m
     var = (2 * n1 * n0 * (2 * n1 * n0 - m)) / (m * m * (m - 1)) if m > 1 else 0.0
-    return {"runs": runs, "z": round((runs - mu) / var ** 0.5, 2) if var > 0 else 0.0}
+    return {"runs": runs, "z": round((runs - mu) / var**0.5, 2) if var > 0 else 0.0}
 
 
 def friedman_period_estimate(letters, *, kappa_p=0.0667, kappa_r=1 / 26):
@@ -1960,7 +2119,11 @@ def analyze(text: str, *, top_ngrams: int = 10, with_contacts: bool = False) -> 
     # Distinguish genuine diffuse digraph structure from a few exact repeats inflating it
     # (deterministic block ciphers / repeated plaintext under transposition). Only run when
     # some trigram actually recurs >=3x, else there's nothing to excise.
-    rep3 = any(c >= 3 for c in Counter(letters[i:i + 3] for i in range(n - 2)).values()) if n >= 12 else False
+    rep3 = (
+        any(c >= 3 for c in Counter(letters[i : i + 3] for i in range(n - 2)).values())
+        if n >= 12
+        else False
+    )
     repeat_adjusted = repeat_adjusted_stats(letters) if rep3 else {}
 
     # Block-of-b transposition / b-graph block cipher fingerprint (repeated n-grams that

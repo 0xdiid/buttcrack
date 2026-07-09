@@ -55,10 +55,32 @@ from .words import long_word_coverage
 
 #: English monogram frequencies (%) for the order-independent chi-square seed.
 _ENG = {
-    "A": 8.2, "B": 1.5, "C": 2.8, "D": 4.3, "E": 12.7, "F": 2.2, "G": 2.0, "H": 6.1,
-    "I": 7.0, "J": 0.15, "K": 0.77, "L": 4.0, "M": 2.4, "N": 6.7, "O": 7.5, "P": 1.9,
-    "Q": 0.095, "R": 6.0, "S": 6.3, "T": 9.1, "U": 2.8, "V": 0.98, "W": 2.4, "X": 0.15,
-    "Y": 2.0, "Z": 0.074,
+    "A": 8.2,
+    "B": 1.5,
+    "C": 2.8,
+    "D": 4.3,
+    "E": 12.7,
+    "F": 2.2,
+    "G": 2.0,
+    "H": 6.1,
+    "I": 7.0,
+    "J": 0.15,
+    "K": 0.77,
+    "L": 4.0,
+    "M": 2.4,
+    "N": 6.7,
+    "O": 7.5,
+    "P": 1.9,
+    "Q": 0.095,
+    "R": 6.0,
+    "S": 6.3,
+    "T": 9.1,
+    "U": 2.8,
+    "V": 0.98,
+    "W": 2.4,
+    "X": 0.15,
+    "Y": 2.0,
+    "Z": 0.074,
 }
 
 
@@ -89,7 +111,7 @@ def _freqs_for(language: str | None) -> dict[str, float]:
         freqs = {chr(65 + i): 0.0 for i in range(26)}
         for gram, lp in sc.log_probs.items():
             if len(gram) == 1 and "A" <= gram <= "Z":
-                freqs[gram] = (10 ** lp) * 100.0
+                freqs[gram] = (10**lp) * 100.0
         for c, v in freqs.items():
             if v <= 0:  # chi-square divides by the expected count
                 freqs[c] = 0.01
@@ -103,11 +125,14 @@ def _chi2(letters: str, freqs: dict[str, float] = _ENG) -> float:
     total = len(letters)
     if not total:
         return 0.0
-    return sum(
-        (counts.get(chr(65 + i), 0) - total * freqs[chr(65 + i)] / 100) ** 2
-        / (total * freqs[chr(65 + i)] / 100)
-        for i in range(26)
-    ) / total
+    return (
+        sum(
+            (counts.get(chr(65 + i), 0) - total * freqs[chr(65 + i)] / 100) ** 2
+            / (total * freqs[chr(65 + i)] / 100)
+            for i in range(26)
+        )
+        / total
+    )
 
 
 def _chi_seed(
@@ -160,8 +185,16 @@ def _qscore(idx: list[int], table: list[float]) -> float:
 
 
 def _recover_shifts(
-    ct: str, header: str, period: int, order: list[int], table: list[float],
-    *, seed: list[int] | None = None, restarts: int = 0, rng=None, passes: int | None = None,
+    ct: str,
+    header: str,
+    period: int,
+    order: list[int],
+    table: list[float],
+    *,
+    seed: list[int] | None = None,
+    restarts: int = 0,
+    rng=None,
+    passes: int | None = None,
 ) -> tuple[float, list[int], list[int]]:
     """Quadgram coordinate-ascent (optionally bounded passes / random restarts) of the
     per-column shifts, scoring the full un-columnar'd plaintext. Returns
@@ -198,8 +231,15 @@ def _recover_shifts(
 
 
 def _hillclimb_order(
-    ct: str, header: str, period: int, width: int, table: list[float],
-    seed: list[int], *, restarts: int, rng,
+    ct: str,
+    header: str,
+    period: int,
+    width: int,
+    table: list[float],
+    seed: list[int],
+    *,
+    restarts: int,
+    rng,
 ) -> tuple[float, list[int]]:
     """Find the columnar read-order by swap hill-climb with random restarts, scoring
     each order by a **deterministic full** quadgram coordinate-ascent of the shifts
@@ -212,6 +252,7 @@ def _hillclimb_order(
     With a full deterministic climb the true order separates
     cleanly (e.g. ~-4.1/quadgram vs ~-5.1 for wrong orders on a period-45 width-8
     instance), with no restart noise to muddy the comparison."""
+
     def objective(order: list[int]) -> float:
         s, _, _ = _recover_shifts(ct, header, period, order, table, seed=seed)
         return s
@@ -270,7 +311,11 @@ def _order_chunk(args):
 
 
 def _brute_order(
-    ct: str, alphabet: str, period: int, width: int, workers: int | None,
+    ct: str,
+    alphabet: str,
+    period: int,
+    width: int,
+    workers: int | None,
     language: str = "english",
 ):
     """Exhaustively find the best column read-order (deterministic full-climb objective),
@@ -383,19 +428,25 @@ def substitution_over_transposition_test(
     flattener_floor = floor + 0.35 * (lang_ioc - floor)
     if chi_ioc >= lang_ioc - 0.010:
         verdict = "substitution-over-transposition"
-        note = (f"chi-square peel snaps whole-text IoC to {chi_ioc:.4f} ~ {language} "
-                f"{lang_ioc:.4f}: the layer under the period-{period} substitution is transposed "
-                f"language — finish with a transposition solve (crack_layered).")
+        note = (
+            f"chi-square peel snaps whole-text IoC to {chi_ioc:.4f} ~ {language} "
+            f"{lang_ioc:.4f}: the layer under the period-{period} substitution is transposed "
+            f"language — finish with a transposition solve (crack_layered)."
+        )
     elif coset_ioc >= flattener_floor:
         verdict = "substitution-over-flattener"
-        note = (f"period-{period} coset IoC {coset_ioc:.4f} is real (digraphic/flattener band, "
-                f"above floor {floor:.4f}) but the peeled whole-text IoC {chi_ioc:.4f} does NOT "
-                f"snap to {language} {lang_ioc:.4f}: the inner is a flattening cipher "
-                f"(fractionation / polygraphic / paired-square), not language.")
+        note = (
+            f"period-{period} coset IoC {coset_ioc:.4f} is real (digraphic/flattener band, "
+            f"above floor {floor:.4f}) but the peeled whole-text IoC {chi_ioc:.4f} does NOT "
+            f"snap to {language} {lang_ioc:.4f}: the inner is a flattening cipher "
+            f"(fractionation / polygraphic / paired-square), not language."
+        )
     else:
         verdict = "no-structure-or-wrong-period"
-        note = (f"period-{period} coset IoC {coset_ioc:.4f} ~ random floor {floor:.4f}: no real "
-                f"period-{period} structure here (try another period/alphabet).")
+        note = (
+            f"period-{period} coset IoC {coset_ioc:.4f} ~ random floor {floor:.4f}: no real "
+            f"period-{period} structure here (try another period/alphabet)."
+        )
 
     overfit = ioc_max - chi_ioc > overfit_gap
     return {
@@ -410,9 +461,13 @@ def substitution_over_transposition_test(
         "gap_to_language": round(gap, 3),
         "verdict": verdict,
         "overfit_warning": overfit,
-        "note": note + (
+        "note": note
+        + (
             f" [OVERFIT WARNING: free IoC-max reaches {ioc_max:.4f} >> chi-square {chi_ioc:.4f} —"
-            " a one-letter-spike artefact; ignore the IoC-max value.]" if overfit else ""),
+            " a one-letter-spike artefact; ignore the IoC-max value.]"
+            if overfit
+            else ""
+        ),
     }
 
 
@@ -467,16 +522,19 @@ def _periodic_decoder(stream: str, header: str, convention: str, period: int):
     pt = [0] * n
 
     if convention == "vigenere":
+
         def apply(shifts: list[int]) -> list[int]:
             for i in range(n):
                 pt[i] = hdr_std[(cn[i] - shifts[i % period]) % 26]
             return pt
     elif convention == "beaufort":
+
         def apply(shifts: list[int]) -> list[int]:
             for i in range(n):
                 pt[i] = hdr_std[(shifts[i % period] - cn[i]) % 26]
             return pt
     elif convention == "variant":
+
         def apply(shifts: list[int]) -> list[int]:
             for i in range(n):
                 pt[i] = hdr_std[(cn[i] + shifts[i % period]) % 26]
@@ -541,7 +599,11 @@ def _refine_periodic(
 
 
 def _combo_solve(
-    stream: str, scorer: NgramScorer, alphabet: str, convention: str, period: int,
+    stream: str,
+    scorer: NgramScorer,
+    alphabet: str,
+    convention: str,
+    period: int,
     table: list[float],
 ) -> tuple[float, str, dict[str, Any]]:
     """Solve a single (alphabet, convention, period) combo on a de-transposed ``stream``.
@@ -659,7 +721,8 @@ def crack_layered(
     """
     ct = only_letters(ciphertext)
     table = _fast_quad_table(scorer)
-    language = language or getattr(scorer, "lang", "english")
+    if not language:  # None or "" -> fall back to the scorer's language
+        language = getattr(scorer, "lang", "english")
     freqs = _freqs_for(language)
     rng = rng or random.Random(0)
     if workers is None:
@@ -678,9 +741,7 @@ def crack_layered(
         seed = _chi_seed(ct, period, header, hpos, freqs)
         for width in widths:
             if width <= brute_max_width:
-                sc, order, plaintext = _brute_order(
-                    ct, alphabet, period, width, workers, language
-                )
+                sc, order, plaintext = _brute_order(ct, alphabet, period, width, workers, language)
             else:
                 sc, order = _hillclimb_order(
                     ct, header, period, width, table, seed, restarts=hill_restarts, rng=rng
@@ -705,8 +766,7 @@ def crack_layered(
         ct, header, period, order, table, seed=_chi_seed(ct, period, header, hpos, freqs)
     )
     residual = (
-        [] if coverage >= 0.42
-        else column_alternatives(ct, header, period, order, shifts, table)
+        [] if coverage >= 0.42 else column_alternatives(ct, header, period, order, shifts, table)
     )
     return {
         "structure": {
@@ -782,8 +842,7 @@ def crack_quagmire_over_columnar(
     # it on long-word coverage (a clean solve tiles into real >=5-letter words).
     coverage = long_word_coverage(plaintext)
     residual = (
-        [] if coverage >= 0.42
-        else column_alternatives(ct, header, period, order, shifts, table)
+        [] if coverage >= 0.42 else column_alternatives(ct, header, period, order, shifts, table)
     )
     return {
         "structure": {
@@ -802,8 +861,15 @@ def crack_quagmire_over_columnar(
 
 
 def column_alternatives(
-    ct: str, header: str, period: int, order: list[int], shifts: list[int],
-    table: list[float], *, top: int = 3, gap: float = 60.0,
+    ct: str,
+    header: str,
+    period: int,
+    order: list[int],
+    shifts: list[int],
+    table: list[float],
+    *,
+    top: int = 3,
+    gap: float = 60.0,
 ) -> list[dict[str, Any]]:
     """Agent-native residual report. For each substitution column whose best shift is
     a near-tie (within ``gap`` quadgram log-prob of an alternative), emit the top
@@ -834,8 +900,16 @@ def column_alternatives(
             trial = list(shifts)
             trial[j] = x
             dec = "".join(chr(65 + v) for v in apply(trial))
-            ctxs = [dec[max(0, p - 4):p] + "[" + dec[p] + "]" + dec[p + 1:p + 5] for p in positions]
-            options.append({"shift": x, "letters": "".join(dec[p] for p in positions),
-                            "contexts": ctxs, "current": x == shifts[j]})
+            ctxs = [
+                dec[max(0, p - 4) : p] + "[" + dec[p] + "]" + dec[p + 1 : p + 5] for p in positions
+            ]
+            options.append(
+                {
+                    "shift": x,
+                    "letters": "".join(dec[p] for p in positions),
+                    "contexts": ctxs,
+                    "current": x == shifts[j],
+                }
+            )
         report.append({"column": j, "options": options})
     return report

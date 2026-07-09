@@ -11,8 +11,8 @@ from __future__ import annotations
 
 import pytest
 
-from buttcrack.ciphers.hill import Hill
 from buttcrack.ciphers import _hill_recover as hr
+from buttcrack.ciphers.hill import Hill
 from buttcrack.scoring import get_scorer
 
 KRY = "KRYPTOSABCDEFGHIJLMNQUVWXZ"
@@ -64,7 +64,9 @@ def test_recover_keyed_affine_full():
 
 def test_recover_keyed_affine_from_153_letters():
     """The hard case: recovery from only 153 letters (pair_brute rescues an outlier row)."""
-    recs = hr.recover(AFFINE_CT[:153], get_scorer(), alphabet=KRY, q_values=(2,), top=2, pair_brute=True)
+    recs = hr.recover(
+        AFFINE_CT[:153], get_scorer(), alphabet=KRY, q_values=(2,), top=2, pair_brute=True
+    )
     assert recs and recs[0].plaintext.startswith(AFFINE_START)
 
 
@@ -98,5 +100,7 @@ def test_crack3_roundtrips_via_hill_key():
 @pytest.mark.slow
 def test_crack_keyed_affine_via_opts():
     """Hill.crack recovers the affine instance when told alphabet and additive period."""
-    res = Hill().crack(AFFINE_CT, get_scorer(), top=2, alphabet="KRYPTOS", q_values=(1, 2), timeout=60)
+    res = Hill().crack(
+        AFFINE_CT, get_scorer(), top=2, alphabet="KRYPTOS", q_values=(1, 2), timeout=60
+    )
     assert res and res[0].plaintext.replace(" ", "").startswith(AFFINE_START)

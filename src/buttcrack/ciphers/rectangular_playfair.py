@@ -93,7 +93,9 @@ def _pairs_from_text(letters: str, cells: int) -> list[tuple[str, str]]:
     return [(s[i], s[i + 1]) for i in range(0, len(s), 2)]
 
 
-def _transform(pairs: list[tuple[str, str]], grid: str, rows: int, cols: int, direction: int) -> str:
+def _transform(
+    pairs: list[tuple[str, str]], grid: str, rows: int, cols: int, direction: int
+) -> str:
     pos = {c: i for i, c in enumerate(grid)}
     out: list[str] = []
     for a, b in pairs:

@@ -71,6 +71,7 @@ def test_crack_recovers_plaintext():
 
 # --- diagonal routes (added alongside the row/col/spiral families) ---
 
+
 def test_diagonal_route_names_registered():
     """Both diagonal families over four corners, plain and serpentine, are present."""
     from buttcrack.ciphers.route import ROUTE_NAMES

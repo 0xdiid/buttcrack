@@ -44,7 +44,8 @@ def test_diagnose_non_stationary_keystream():
 
 def test_diagnose_flags_homophonic_expansion():
     # tri-square-family shape: each plaintext letter -> trigraph with C1 = P + C2 + C3 (mod 26)
-    # in the KRYPTOS alphabet; flat IoC, no period, no repeats — only the linear-relation scan sees it.
+    # in the KRYPTOS alphabet; flat IoC, no period, no repeats — only the linear-relation scan
+    # sees it.
     import random
 
     from buttcrack.keysources import KRYPTOS

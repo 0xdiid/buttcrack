@@ -34,7 +34,6 @@ from ..text import only_letters
 from .base import Cipher
 from .squares import PolybiusSquare
 
-
 _FULL_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 

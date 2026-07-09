@@ -100,7 +100,7 @@ def keys_from_corpus(
     else:
         corpus = list(corpus)
         labs = labels if labels is not None else [f"#{i}" for i in range(len(corpus))]
-        items = list(zip(labs, corpus))
+        items = list(zip(labs, corpus, strict=False))
 
     out: list[dict] = []
     seen: set[tuple[str, str]] = set()
@@ -144,6 +144,7 @@ def keys_from_corpus(
 
 # --- composed keys (word-pair canon) -----------------------------------------------
 
+
 def _combine(a: int, b: int, convention: str) -> int:
     if convention == "vigenere":
         return (a + b) % 26
@@ -166,8 +167,12 @@ def _uncombine(c: int, b: int, convention: str) -> int:
 
 
 def compose_key(
-    word_a: str, word_b: str, *, alphabet: str = "KRYPTOS",
-    convention: str = "vigenere", period: int | None = None,
+    word_a: str,
+    word_b: str,
+    *,
+    alphabet: str = "KRYPTOS",
+    convention: str = "vigenere",
+    period: int | None = None,
 ) -> str:
     """Build a composed key: ``word_a`` enciphered under ``word_b``.
 
@@ -183,8 +188,7 @@ def compose_key(
     if period is None:
         period = a.__len__() * b.__len__() // gcd(len(a), len(b))
     return "".join(
-        alpha[_combine(pos[a[i % len(a)]], pos[b[i % len(b)]], convention)]
-        for i in range(period)
+        alpha[_combine(pos[a[i % len(a)]], pos[b[i % len(b)]], convention)] for i in range(period)
     )
 
 
@@ -198,7 +202,11 @@ def _minimal_period(s: str) -> int:
 
 
 def decompose_key(
-    key: str, words, *, alphabet: str = "KRYPTOS", convention: str = "vigenere",
+    key: str,
+    words,
+    *,
+    alphabet: str = "KRYPTOS",
+    convention: str = "vigenere",
 ) -> list[dict]:
     """Recover the ``(word_a, word_b)`` pairs that build ``key`` via :func:`compose_key`.
 
@@ -233,6 +241,13 @@ def decompose_key(
                 continue
             if a in vocab and (a, b) not in seen:
                 seen.add((a, b))
-                found.append({"word_a": a, "word_b": b, "period": P,
-                              "alphabet": alpha, "convention": convention})
+                found.append(
+                    {
+                        "word_a": a,
+                        "word_b": b,
+                        "period": P,
+                        "alphabet": alpha,
+                        "convention": convention,
+                    }
+                )
     return found

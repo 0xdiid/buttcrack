@@ -83,7 +83,8 @@ from __future__ import annotations
 import math
 import random
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from typing import Any
 
 from .scoring import index_of_coincidence, resolve_scorer
 from .text import only_letters
@@ -109,10 +110,32 @@ THEMATIC_KEYWORDS = (
 
 #: English letter frequencies (A..Z), for the cheap per-column chi-squared score.
 _ENGLISH_FREQ = (
-    0.08167, 0.01492, 0.02782, 0.04253, 0.12702, 0.02228, 0.02015, 0.06094,
-    0.06966, 0.00153, 0.00772, 0.04025, 0.02406, 0.06749, 0.07507, 0.01929,
-    0.00095, 0.05987, 0.06327, 0.09056, 0.02758, 0.00978, 0.02360, 0.00150,
-    0.01974, 0.00074,
+    0.08167,
+    0.01492,
+    0.02782,
+    0.04253,
+    0.12702,
+    0.02228,
+    0.02015,
+    0.06094,
+    0.06966,
+    0.00153,
+    0.00772,
+    0.04025,
+    0.02406,
+    0.06749,
+    0.07507,
+    0.01929,
+    0.00095,
+    0.05987,
+    0.06327,
+    0.09056,
+    0.02758,
+    0.00978,
+    0.02360,
+    0.00150,
+    0.01974,
+    0.00074,
 )
 
 
@@ -425,9 +448,7 @@ def _chi_squared(letters: str) -> float:
     return total
 
 
-def _recover_key_for_period(
-    grid: Grid, ct: str, period: int
-) -> tuple[list[int], str]:
+def _recover_key_for_period(grid: Grid, ct: str, period: int) -> tuple[list[int], str]:
     """Greedy per-column key recovery for a fixed period.
 
     Each of ``period`` key positions is an independent coordinate offset (one of the
@@ -458,9 +479,7 @@ def _recover_key_for_period(
                 best_chi, best_k = chi, kcell
         key_idx[col] = best_k
 
-    plain = "".join(
-        square[decrypt_table[key_idx[i % period]][ct_idx[i]]] for i in range(n)
-    )
+    plain = "".join(square[decrypt_table[key_idx[i % period]][ct_idx[i]]] for i in range(n))
     return key_idx, plain
 
 
@@ -591,7 +610,7 @@ def _scan(
     refine: bool,
 ) -> dict:
     """Inner sweep used by both the real solve and the synthetic control."""
-    best = {
+    best: dict[str, Any] = {
         "score": -1e18,
         "plaintext": "",
         "square": "",
@@ -615,9 +634,7 @@ def _scan(
     if refine and best["period"]:
         grid = build_grid(best["shape"], best["square_keyword"], base)
         key_idx = best["key_indices"]
-        rk, rplain, rscore = _anneal_key(
-            grid, text, key_idx, scorer, rng=rng, deadline=deadline
-        )
+        rk, rplain, rscore = _anneal_key(grid, text, key_idx, scorer, rng=rng, deadline=deadline)
         if rscore > best["score"]:
             best = _record(
                 grid,
@@ -680,7 +697,7 @@ def _run_control(
         refine=refine,
     )
     recovered = got["plaintext"]
-    matches = sum(1 for a, b in zip(recovered, english) if a == b)
+    matches = sum(1 for a, b in zip(recovered, english, strict=False) if a == b)
     frac = matches / len(english) if english else 0.0
     return {
         "recovery_fraction": round(frac, 4),
@@ -747,22 +764,29 @@ def _self_test() -> None:
     distinct = sorted(set(ct))
     has_j = "J" in ct
     no_fill = all("A" <= c <= "Z" for c in ct)
-    print(f"    emits letters only: {no_fill}; distinct symbols: {len(distinct)}; "
-          f"distinct J emitted: {has_j}")
-    print(f"    plaintext IoC={index_of_coincidence(pt):.4f} -> "
-          f"ciphertext IoC={index_of_coincidence(ct):.4f} (flattened toward random)")
+    print(
+        f"    emits letters only: {no_fill}; distinct symbols: {len(distinct)}; "
+        f"distinct J emitted: {has_j}"
+    )
+    print(
+        f"    plaintext IoC={index_of_coincidence(pt):.4f} -> "
+        f"ciphertext IoC={index_of_coincidence(ct):.4f} (flattened toward random)"
+    )
     # confirm non-shift: a Vigenere over the same keyed alphabet differs
     g = build_grid("2x13", "KRYPTOS")
     pos = g.pos
     kk = [pos[c] for c in "KEYWORD"]
     vig = "".join(g.square[(pos[c] + kk[i % len(kk)]) % 26] for i, c in enumerate(pt))
-    print(f"    differs from a same-alphabet Vigenere: {ct != vig} "
-          f"(coordinate additive is non-shift)")
+    print(
+        f"    differs from a same-alphabet Vigenere: {ct != vig} (coordinate additive is non-shift)"
+    )
 
     # 5x5 cannot emit J -- explicitly demonstrate the ruled-out form's tell
     g5 = build_grid("5x5", "KRYPTOS")
-    print(f"    5x5 form can_emit_j={g5.can_emit_j} "
-          f"(ruled out for any panel that requires a distinct J)")
+    print(
+        f"    5x5 form can_emit_j={g5.can_emit_j} "
+        f"(ruled out for any panel that requires a distinct J)"
+    )
 
     # --- blind recovery on a planted KRYPTOS-keyed instance ----------------
     print("\n[2] blind recovery of a planted KRYPTOS-keyed instance (N=272)")
@@ -783,7 +807,11 @@ def _self_test() -> None:
         refine=True,
     )
     rec = res["plaintext"]
-    pct = 100.0 * sum(1 for a, b in zip(rec, only_letters(pt)) if a == b) / len(only_letters(pt))
+    pct = (
+        100.0
+        * sum(1 for a, b in zip(rec, only_letters(pt), strict=False) if a == b)
+        / len(only_letters(pt))
+    )
     print(f"    planted: shape={plant_shape} square={plant_kw} key={plant_key}")
     print(f"    recovered: period={res['period']} key={res['key']!r} score={res['score']:.3f}")
     print(f"    blind recovery: {pct:.1f}% of plaintext letters")
@@ -803,9 +831,11 @@ def _self_test() -> None:
         timeout=60.0,
         refine=True,
     )
-    print(f"    control recovery_fraction={ctrl['recovery_fraction']} "
-          f"clears_90%={ctrl['clears_threshold']} "
-          f"(true_period={ctrl['true_period']} recovered={ctrl['recovered_period']})")
+    print(
+        f"    control recovery_fraction={ctrl['recovery_fraction']} "
+        f"clears_90%={ctrl['clears_threshold']} "
+        f"(true_period={ctrl['true_period']} recovered={ctrl['recovered_period']})"
+    )
     print("\n    => If clears_90% is True, a flat result on the target is a real REFUTATION.")
     print("       If False, the hypothesis is UNFALSIFIABLE by blind crack at this length;")
     print("       the search is too weak to distinguish a true negative, do NOT claim refuted.")

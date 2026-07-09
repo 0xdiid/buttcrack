@@ -174,7 +174,7 @@ def test_autokey_crib_unzip_recovers_plaintext_kryptos():
     assert hits, "autokey unzip should recover at least one readable plaintext"
     best = hits[0]
     # the unzipped plaintext matches the original from position L onward (primer unknown).
-    assert best["plaintext"][len(primer):] == _PT[len(primer):]
+    assert best["plaintext"][len(primer) :] == _PT[len(primer) :]
     assert best["primer_len"] == len(primer)
     assert best["word_coverage"] > 0.45
 
@@ -189,7 +189,7 @@ def test_autokey_crib_unzip_std_alphabet():
         ct, [crib], alphabets=("STD",), conventions=("vigenere",), max_primer=10
     )
     assert hits
-    assert hits[0]["plaintext"][len(primer):] == _PT[len(primer):]
+    assert hits[0]["plaintext"][len(primer) :] == _PT[len(primer) :]
     assert hits[0]["alphabet"] == "STD"
 
 

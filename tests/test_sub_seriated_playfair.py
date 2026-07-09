@@ -32,8 +32,12 @@ ENGLISH = only_letters(
 
 def _plant(pt, square_kw, shifts, *, period=7, drop="J", alpha="KRYPTOS"):
     return encrypt_sub_over_seriated_playfair(
-        pt, square_kw, outer_alphabet=alpha, inner_period=period,
-        outer_shifts=shifts, drop_letter=drop,
+        pt,
+        square_kw,
+        outer_alphabet=alpha,
+        inner_period=period,
+        outer_shifts=shifts,
+        drop_letter=drop,
     )
 
 
@@ -81,8 +85,13 @@ def test_crack_ranks_correct_square_far_above_plateau():
     ct = _plant(ENGLISH, "BUTTERFLY", shifts)
     squares = ["RANDOMXYZ", "MEADOW", "BUTTERFLY", "NEEDLE", "SILVER"]
     res = crack_sub_over_seriated_playfair(
-        ct, inner_period=7, outer_period=7, squares=squares,
-        objective="fitness", drop_letter="J", top=5,
+        ct,
+        inner_period=7,
+        outer_period=7,
+        squares=squares,
+        objective="fitness",
+        drop_letter="J",
+        top=5,
     )
     assert res, "expected candidates"
     best_sq, _key, best_pt, best_score = res[0]

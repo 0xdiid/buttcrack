@@ -6,6 +6,54 @@ and not yet published, so changes are grouped by milestone rather than release.
 
 ## Unreleased
 
+### Added (agent-reachable CLI for key-sourcing / validation / Hill-KPA + sibling, winding, and non-prose tools)
+A campaign consolidation pass: several powerful modules existed only as a library (no `butt`
+subcommand, so an agent driving the CLI could not reach them), and a few cross-cutting primitives
+were being hand-rolled repeatedly. All are now first-class, PK-agnostic, and tested.
+
+- **`butt keysource`** exposes `keysources`: derive candidate keys from a corpus of prior
+  solutions (whole text as a running key, acrostics, words, windows, light transforms), and
+  **compose / decompose two-word keys** (`--compose MAPLE RIVERBANK` → the period-`lcm` composed
+  key; `--decompose KEY --words …` recovers the pair). Give a target ciphertext and it screens the
+  corpus's running-key candidates through the IoC-outlier test in one shot — the literal "each
+  puzzle builds on the last" attack.
+- **`butt validate`** exposes the validate-on-synthetic discipline: build a same-structure
+  synthetic ciphertext from a family grammar (`--structure`, `--sub-key`, `--columnar-keyword`, …)
+  and, with `--self-check`, run `butt auto` against it and report whether it recovers — so a
+  negative on a real ciphertext is only trusted after the attack passes its own positive control.
+- **`butt hillkpa`** exposes `hill_kpa`: the known-plaintext Hill attack (slide a crib, recover the
+  `n×n` key over a keyed alphabet via CRT over `Z26`, decrypt and rank).
+- **`buttcrack.windings`** (new) — position-permutation generators the route cipher lacked:
+  triangular (`T_n`) reads (e.g. 153 = T₁₇), plus **coset-preserving** permutations (affine /
+  fold / faro within each residue class) and, crucially, `coset_preserving_shuffle` — the *honest
+  null* for a coset-IC-elevated ciphertext (shuffling only within each residue class preserves
+  each coset's multiset; a plain letter shuffle is the wrong null and manufactures false positives).
+- **`buttcrack.compare`** + **`butt compare`** (new) — sibling-pair analysis for a chained series:
+  are two ciphertexts plausibly the same construction? Combines sorted-frequency-profile distance
+  (closer to each other than to English?), a per-period kappa signature (same period; one wound /
+  one flat = same substitution, different winding), and a two-ciphertext additive-translate
+  superimposition (depth battery), into a transparent, conservative verdict.
+- **`buttcrack.nonprose`** + **`butt nonprose`** (new) — a route/instruction genre model vs a prose
+  model, anchor-normalized, flagging a candidate that scores in the English "ghost band" but reads
+  as directions / coordinates / a list (a structured payload an English-only scorer would reject).
+- **`analysis.period_family_significance(...)`** + **`butt stats --family`** — the period/kappa
+  scans report a *per-period* z, but the scan keeps the best of many periods, and that maximum is
+  selection-biased (§10). This calibrates the strongest period against the distribution of the
+  *max calibrated z over the whole period grid* on shuffles, returning a family-corrected p. A
+  per-period z of +3 that does not clear the family null (e.g. +2.5 on random text) is
+  multiplicity noise, not a period — the exact trap that repeatedly cost the campaign time.
+- **`buttcrack.crib_algebra`** (new) — exact crib solver for the superimposed-additive family
+  (`shift_i = a[i mod P] + b[i mod Q]`): a crib's positions are bipartite-graph edges on the P+Q
+  key nodes, and within each connected component the gauge freedom cancels in every `a+b` sum, so
+  crib-covered positions decrypt **exactly** (often pinning positions *beyond* the crib) while
+  surplus cycle edges give exact mod-26 consistency checks that reject a wrong crib.
+- **`buttcrack.assignment.hungarian_max(matrix)`** (new) — `O(n^3)` maximum-weight assignment
+  (match rows to distinct columns under a per-pair score) for jigsaw / row-to-phase matching
+  without enumerating orderings.
+- **`buttcrack.twostream`** (new) — blind two-stream additive split (Reddy–Knight): when a
+  ciphertext is the sum of two natural-English streams (`c = x + y mod 26`), a char-LM beam over
+  both contexts recovers the pair; a `metric` power test separates a true EN+EN sum from shuffles.
+
 ### Added (period "inner content" diagnostic — language vs. flattened under a detected period)
 Generalized from a two-layer-cipher triage where a weak periodic signal repeatedly looked like
 a plain Vigenere but was not.

@@ -7,8 +7,6 @@ floor for a flattener or for no period.
 
 from __future__ import annotations
 
-import random
-
 from buttcrack.analysis import superimposition_periods
 from buttcrack.ciphers.bifid import Bifid
 from buttcrack.text import only_letters

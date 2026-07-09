@@ -136,9 +136,7 @@ def _split_complete_blocks(ct: str, width: int) -> list[str]:
     return [ct[k * h : (k + 1) * h] for k in range(width)]
 
 
-def _pair_matrix(
-    blocks: list[str], table: dict[str, float], floor: float
-) -> list[list[float]]:
+def _pair_matrix(blocks: list[str], table: dict[str, float], floor: float) -> list[list[float]]:
     """``M[a][b]`` = mean bigram log-prob of stacking block ``a`` left of block ``b``.
 
     Precomputed once for the complete-grid case so a full arrangement scores in

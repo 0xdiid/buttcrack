@@ -22,7 +22,7 @@ Public API
 ``two_square_transform``                          the reciprocal two-square map given two grids
 ``encrypt_sub_over_two_square``                   plant CT = outer(two_square(PT))
 ``recover_outer_key_over_two_square``             key-given-structure recovery (one pair/layout)
-``crack_sub_over_two_square``                     driver over candidate square pairs + layouts/periods
+``crack_sub_over_two_square``                  driver over candidate square pairs + layouts/periods
 """
 
 from __future__ import annotations
@@ -99,8 +99,12 @@ def encrypt_sub_over_two_square(
     alpha = resolve_alphabet(outer_alphabet)
     a25 = fs_alphabet(drop_letter)
     prepared = "".join(c for c in pt.upper() if c in set(a25))
-    inner = two_square_transform(prepared, fs_grid(top_keyword, drop_letter),
-                                 fs_grid(bot_keyword, drop_letter), vertical=vertical)
+    inner = two_square_transform(
+        prepared,
+        fs_grid(top_keyword, drop_letter),
+        fs_grid(bot_keyword, drop_letter),
+        vertical=vertical,
+    )
     return sub_encode(inner, alpha, outer_shifts)
 
 
@@ -274,9 +278,17 @@ def crack_sub_over_two_square(
                 for vertical in layouts:
                     for op in periods:
                         shifts, pt, score = recover_outer_key_over_two_square(
-                            letters, tg, bg, outer_alphabet=outer_alphabet, outer_period=op,
-                            drop_letter=drop, vertical=vertical, objective_fn=obj, rng=rng,
-                            brute_cap=brute_cap)
+                            letters,
+                            tg,
+                            bg,
+                            outer_alphabet=outer_alphabet,
+                            outer_period=op,
+                            drop_letter=drop,
+                            vertical=vertical,
+                            objective_fn=obj,
+                            rng=rng,
+                            brute_cap=brute_cap,
+                        )
                         if not pt:
                             continue
                         results.append((score, tg, bg, vertical, _shifts_to_keystr(shifts), pt))

@@ -12,6 +12,8 @@ Pure / read-only — it never decrypts; run the recommended crackers for that.
 
 from __future__ import annotations
 
+from typing import Any
+
 from . import ngram_relation
 from .analysis import (
     block_transposition_signal,
@@ -58,12 +60,13 @@ def diagnose(text: str) -> dict:
 
     # Reusable cryptanalytic deductions, gated on the measured stats below and emitted alongside
     # the structure verdict. ``flattened_reading`` marks the branches where >=1 flattening layer is
-    # implied; ``headline_period`` is the period a branch chose to headline (checked for small-sample).
+    # implied; ``headline_period`` is the period a branch chose to headline (checked for
+    # small-sample).
     inferences: list[str] = []
     flattened_reading = False
     headline_period: int | None = None
 
-    signals = {
+    signals: dict[str, Any] = {
         "index_of_coincidence": round(ioc, 4),
         "chi_squared_per_letter": round(chi2pl, 4),
         "calibrated_periods": periods,
@@ -83,8 +86,10 @@ def diagnose(text: str) -> dict:
         if chi2pl <= 0.5:
             structure = "transposition (letters unchanged, order scrambled)"
             recommended = [
-                "butt crack columnar", "butt crack route",
-                "butt crack railfence", "butt auto",
+                "butt crack columnar",
+                "butt crack route",
+                "butt crack railfence",
+                "butt auto",
             ]
             summary = f"IoC {ioc:.4f} ~ English, low chi2/letter: letters reordered, not remapped."
         else:
@@ -117,11 +122,13 @@ def diagnose(text: str) -> dict:
             harmonic = (
                 f" (top-z period {best['period']} is a small-sample harmonic;"
                 f" the reliable fundamental is {check_period})"
-                if best["period"] != check_period else ""
+                if best["period"] != check_period
+                else ""
             )
             summary = (
                 f"Period {check_period} is real (z={inner['z']}), but its coset IoC "
-                f"{inner['coset_ioc']} is well below English {inner['english_ioc']}: the text UNDER "
+                f"{inner['coset_ioc']} is well below English {inner['english_ioc']}: the text "
+                "UNDER "
                 f"the period-{check_period} layer is not a simple language{harmonic}. A plain "
                 "Vigenere/Quagmire peel will NOT read — this is a two-layer cipher (periodic sub "
                 "over a polygraphic/digraphic inner: Playfair/Hill/fractionation) or a non-prose "
@@ -142,7 +149,8 @@ def diagnose(text: str) -> dict:
                 recommended = [
                     "butt crack slidefair   (periodic digraphic — Playfair slide)",
                     "butt crack seriated-playfair",
-                    "# no linear channel: the inner is NONLINEAR digraphic (Playfair) or fractionation",
+                    "# no linear channel: the inner is NONLINEAR digraphic (Playfair) "
+                    "or fractionation",
                     "butt crib --keyed --crib <word>   (a crib is the lever when blind fails)",
                 ]
         else:
@@ -243,7 +251,10 @@ def diagnose(text: str) -> dict:
         )
         unit_cmds = []
         for u in units:
-            unit_cmds.append(f"butt transsub --unit {u}  (reveal a periodic sub under a block-of-{u} transposition)")
+            unit_cmds.append(
+                f"butt transsub --unit {u}  (reveal a periodic sub under a block-of-{u} "
+                "transposition)"
+            )
             unit_cmds.append(f"butt crack columnar --unit {u}")
         recommended = unit_cmds + recommended
 
@@ -267,16 +278,17 @@ def diagnose(text: str) -> dict:
             "symbols, which are absent)."
         )
 
-    # (b) A below-random coset/column IoC is NOT proof that 'a monoalphabetic is impossible' and does
-    # NOT exclude a polygraphic inner: flattening ciphers (Hill, fractionation) push cosets below the
-    # 1/26 floor too, so a sub-floor coset is expected there, not diagnostic against them.
+    # (b) A below-random coset/column IoC is NOT proof that 'a monoalphabetic is impossible'
+    # and does NOT exclude a polygraphic inner: flattening ciphers (Hill, fractionation) push
+    # cosets below the 1/26 floor too, so a sub-floor coset is expected there, not diagnostic
+    # against them.
     below_random = (coset_ioc is not None and coset_ioc < _RANDOM_IOC) or (
         min_period_ioc is not None and min_period_ioc < _RANDOM_IOC
     )
     if flattened_reading and below_random:
         inferences.append(
-            "a below-random coset/column IoC is NOT diagnostic on its own: flattened ciphers (Hill, "
-            "fractionation) also drive cosets below the 1/26 floor, so it neither proves "
+            "a below-random coset/column IoC is NOT diagnostic on its own: flattened ciphers "
+            "(Hill, fractionation) also drive cosets below the 1/26 floor, so it neither proves "
             "'monoalphabetic impossible' nor excludes a polygraphic/fractionation inner."
         )
 
@@ -289,8 +301,8 @@ def diagnose(text: str) -> dict:
             "not the number of stacked layers."
         )
 
-    # (d) Small-sample period caveat (wires in cipher_id.period_significance): don't headline a period
-    # whose mod-p cosets are too thin to trust, even if its coset IoC looks elevated.
+    # (d) Small-sample period caveat (wires in cipher_id.period_significance): don't headline a
+    # period whose mod-p cosets are too thin to trust, even if its coset IoC looks elevated.
     if headline_period and headline_period >= 2:
         sig = period_significance(letters, periods=[headline_period], samples=60)
         _mean, lpc, pz, small = sig[headline_period]
@@ -298,8 +310,8 @@ def diagnose(text: str) -> dict:
             inferences.append(
                 f"CAUTION: period {headline_period} rests on only ~{lpc:.0f} letters/coset "
                 f"(< {SMALL_SAMPLE_COSET}); its coset IoC is small-sample and may be an artifact "
-                "that evaporates as the message lengthens — confirm on a longer sample or a smaller "
-                "fundamental before committing to it."
+                "that evaporates as the message lengthens — confirm on a longer sample or a "
+                "smaller fundamental before committing to it."
             )
 
     if inferences:

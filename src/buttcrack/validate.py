@@ -203,9 +203,7 @@ def make_synthetic(
     def _sub_enc(text: str) -> str:
         if not sub_key:
             raise ValueError(f"structure {structure!r} requires a 'sub_key'")
-        return encode_substitution(
-            text, sub_key, substitution=substitution, alphabet=alphabet
-        )
+        return encode_substitution(text, sub_key, substitution=substitution, alphabet=alphabet)
 
     def _col_enc(text: str, keyword: str) -> str:
         return encode_columnar(text, keyword)

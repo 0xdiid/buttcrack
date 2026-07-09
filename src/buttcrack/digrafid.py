@@ -52,6 +52,7 @@ from __future__ import annotations
 
 import math
 import random
+from typing import Any
 
 try:  # normal package import
     from .scoring import ENGLISH_LETTER_ENTROPY, resolve_scorer
@@ -67,9 +68,21 @@ SYMS27 = STANDARD + SEP  # canonical 27-symbol order
 
 #: candidate crib words for the cracker (override per puzzle).
 THEMATIC_KEYWORDS = (
-    "KRYPTOS", "CIPHER", "SECRET", "MESSAGE", "KEYWORD",
-    "PUZZLE", "ALPHABET", "DELASTELLE", "FRACTION", "DIGRAFID",
-    "SQUARE", "PERIOD", "COLUMN", "ENCODE", "DECODE",
+    "KRYPTOS",
+    "CIPHER",
+    "SECRET",
+    "MESSAGE",
+    "KEYWORD",
+    "PUZZLE",
+    "ALPHABET",
+    "DELASTELLE",
+    "FRACTION",
+    "DIGRAFID",
+    "SQUARE",
+    "PERIOD",
+    "COLUMN",
+    "ENCODE",
+    "DECODE",
 )
 
 
@@ -156,23 +169,23 @@ def encrypt(plaintext: str, top: str, bottom: str, period: int) -> str:
     for i in range(0, len(pt), 2):
         L1, L2 = pt[i], pt[i + 1]
         p1, p2 = ti[L1], bi[L2]
-        d1 = (p1 % 9) + 1            # top column of L1
+        d1 = (p1 % 9) + 1  # top column of L1
         d2 = 3 * (p1 // 9) + (p2 % 3) + 1  # 3×3 lookup (L1 top row, L2 bottom col)
-        d3 = (p2 // 3) + 1          # bottom row of L2
+        d3 = (p2 // 3) + 1  # bottom row of L2
         triples.append((d1, d2, d3))
 
     out: list[str] = []
     for start in range(0, len(triples), period):
-        block = triples[start:start + period]
+        block = triples[start : start + period]
         p = len(block)
-        flat = [d for tr in block for d in tr]          # row-major 3*p digits
+        flat = [d for tr in block for d in tr]  # row-major 3*p digits
         perm = _readout_perm(p)
-        read = [flat[perm[k]] for k in range(3 * p)]    # column read-out
+        read = [flat[perm[k]] for k in range(3 * p)]  # column read-out
         for j in range(p):
             x, y, z = read[3 * j], read[3 * j + 1], read[3 * j + 2]
             r, c = divmod(y - 1, 3)
-            C1 = top[r * 9 + (x - 1)]       # top[row=r, col=x-1]
-            C2 = bottom[(z - 1) * 3 + c]    # bottom[row=z-1, col=c]
+            C1 = top[r * 9 + (x - 1)]  # top[row=r, col=x-1]
+            C2 = bottom[(z - 1) * 3 + c]  # bottom[row=z-1, col=c]
             out.append(C1)
             out.append(C2)
     return "".join(out)
@@ -192,24 +205,24 @@ def decrypt(ciphertext: str, top: str, bottom: str, period: int) -> str:
     for i in range(0, len(ct), 2):
         C1, C2 = ct[i], ct[i + 1]
         q1, q2 = ti[C1], bi[C2]
-        x = (q1 % 9) + 1            # top column of C1
-        y = 3 * (q1 // 9) + (q2 % 3) + 1   # 3×3 lookup (C1 top row, C2 bottom col)
-        z = (q2 // 3) + 1          # bottom row of C2
+        x = (q1 % 9) + 1  # top column of C1
+        y = 3 * (q1 // 9) + (q2 % 3) + 1  # 3×3 lookup (C1 top row, C2 bottom col)
+        z = (q2 // 3) + 1  # bottom row of C2
         read_triples.append((x, y, z))
 
     out: list[str] = []
     for start in range(0, len(read_triples), period):
-        block = read_triples[start:start + period]
+        block = read_triples[start : start + period]
         p = len(block)
-        read = [d for tr in block for d in tr]          # column-read order
+        read = [d for tr in block for d in tr]  # column-read order
         perm = _readout_perm(p)
         inv = _inv_perm(perm)
-        flat = [read[inv[k]] for k in range(3 * p)]      # back to row-major
+        flat = [read[inv[k]] for k in range(3 * p)]  # back to row-major
         for j in range(p):
             d1, d2, d3 = flat[3 * j], flat[3 * j + 1], flat[3 * j + 2]
             row1, col2 = divmod(d2 - 1, 3)
-            L1 = top[row1 * 9 + (d1 - 1)]      # top[row=row1, col=d1-1]
-            L2 = bottom[(d3 - 1) * 3 + col2]   # bottom[row=d3-1, col=col2]
+            L1 = top[row1 * 9 + (d1 - 1)]  # top[row=row1, col=d1-1]
+            L2 = bottom[(d3 - 1) * 3 + col2]  # bottom[row=d3-1, col=col2]
             out.append(L1)
             out.append(L2)
     return "".join(out)
@@ -319,24 +332,24 @@ def _make_scorer(ct: str, period: int, n: int, coded: dict, floor: float):
         for j in range(p):
             digits = []
             for f in (3 * j, 3 * j + 1, 3 * j + 2):
-                k = inv[f]               # read-order index within block
-                cd = start + (k // 3)    # absolute ct digraph index
-                slot = k % 3             # 0->x, 1->y, 2->z
+                k = inv[f]  # read-order index within block
+                cd = start + (k // 3)  # absolute ct digraph index
+                slot = k % 3  # 0->x, 1->y, 2->z
                 digits.append((cd, slot))
-            src.append((digits[0][0], digits[0][1],
-                        digits[1][0], digits[1][1],
-                        digits[2][0], digits[2][1]))
+            src.append(
+                (digits[0][0], digits[0][1], digits[1][0], digits[1][1], digits[2][0], digits[2][1])
+            )
 
     base = 26 ** (n - 1)
 
     def _digit(cd: int, slot: int, top_pos, bot_pos) -> int:
         q1 = top_pos[c1[cd]]
         q2 = bot_pos[c2[cd]]
-        if slot == 0:           # x = top column of C1
+        if slot == 0:  # x = top column of C1
             return (q1 % 9) + 1
-        if slot == 1:           # y = 3×3 lookup (C1 top row, C2 bottom col)
+        if slot == 1:  # y = 3×3 lookup (C1 top row, C2 bottom col)
             return 3 * (q1 // 9) + (q2 % 3) + 1
-        return (q2 // 3) + 1     # z = bottom row of C2
+        return (q2 // 3) + 1  # z = bottom row of C2
 
     def fitness(top_list, bottom_list) -> float:
         # inverse maps: symbol-index (into SYMS27) -> flat grid position
@@ -347,7 +360,7 @@ def _make_scorer(ct: str, period: int, n: int, coded: dict, floor: float):
         for pos, ch in enumerate(bottom_list):
             bot_pos[sym_idx[ch]] = pos
         out: list[int] = []
-        for (cd0, s0, cd1, s1, cd2, s2) in src:
+        for cd0, s0, cd1, s1, cd2, s2 in src:
             d1 = _digit(cd0, s0, top_pos, bot_pos)
             d2 = _digit(cd1, s1, top_pos, bot_pos)
             d3 = _digit(cd2, s2, top_pos, bot_pos)
@@ -379,10 +392,18 @@ def _make_scorer(ct: str, period: int, n: int, coded: dict, floor: float):
     return fitness
 
 
-def _anneal(ct: str, period: int, top0: str, bottom0: str,
-            n: int, coded: dict, floor: float,
-            iters: int, rng: random.Random,
-            scorer=None) -> tuple[float, str, str]:
+def _anneal(
+    ct: str,
+    period: int,
+    top0: str,
+    bottom0: str,
+    n: int,
+    coded: dict,
+    floor: float,
+    iters: int,
+    rng: random.Random,
+    scorer=None,
+) -> tuple[float, str, str]:
     """One annealing run over the two grids for a fixed period."""
     top = list(top0)
     bottom = list(bottom0)
@@ -415,8 +436,9 @@ def _anneal(ct: str, period: int, top0: str, bottom0: str,
     return best, "".join(best_top), "".join(best_bottom)
 
 
-def solve_digrafid(ct: str, periods=range(3, 23), restarts: int = 24,
-                   iters: int = 6000, seed: int = 0) -> dict:
+def solve_digrafid(
+    ct: str, periods=range(3, 23), restarts: int = 24, iters: int = 6000, seed: int = 0
+) -> dict:
     """Blind Digrafid cracker: sweep ``periods`` and anneal the two grids.
 
     Parameters
@@ -437,26 +459,40 @@ def solve_digrafid(ct: str, periods=range(3, 23), restarts: int = 24,
     n, coded, floor = _hexagram_tables(scorer)
     rng = random.Random(seed)
 
-    best = {"score": float("-inf"), "plaintext": "", "grids": (SYMS27, SYMS27),
-            "period": None}
+    best: dict[str, Any] = {
+        "score": float("-inf"),
+        "plaintext": "",
+        "grids": (SYMS27, SYMS27),
+        "period": None,
+    }
     for period in periods:
         period_scorer = _make_scorer(letters, period, n, coded, floor)
-        for r in range(restarts):
+        for _r in range(restarts):
             top0, bottom0 = _seed_grids(rng)
-            sc, top, bottom = _anneal(ct, period, top0, bottom0,
-                                      n, coded, floor, iters, rng,
-                                      scorer=period_scorer)
+            sc, top, bottom = _anneal(
+                ct, period, top0, bottom0, n, coded, floor, iters, rng, scorer=period_scorer
+            )
             if sc > best["score"]:
                 pt = decrypt(letters, top, bottom, period)
-                best = {"score": scorer.fitness(pt), "plaintext": pt,
-                        "grids": (top, bottom), "period": period}
+                best = {
+                    "score": scorer.fitness(pt),
+                    "plaintext": pt,
+                    "grids": (top, bottom),
+                    "period": period,
+                }
     return best
 
 
-def control_recovery(period: int, n_letters: int = 272, *,
-                     restarts: int = 24, iters: int = 6000,
-                     plant_seed: int = 7, solve_seed: int = 1,
-                     keyed: bool = True) -> dict:
+def control_recovery(
+    period: int,
+    n_letters: int = 272,
+    *,
+    restarts: int = 24,
+    iters: int = 6000,
+    plant_seed: int = 7,
+    solve_seed: int = 1,
+    keyed: bool = True,
+) -> dict:
     """Plant a synthetic Digrafid (English PT, keyword-keyed grids) at
     ``n_letters`` and blind-crack it under the given budget; report char-match.
 
@@ -476,17 +512,22 @@ def control_recovery(period: int, n_letters: int = 272, *,
         top, bottom = "".join(t), "".join(b)
     ct = encrypt(plain, top, bottom, period)
     # period is swept blind (it is not given to the solver)
-    res = solve_digrafid(ct, periods=[period], restarts=restarts,
-                         iters=iters, seed=solve_seed)
+    res = solve_digrafid(ct, periods=[period], restarts=restarts, iters=iters, seed=solve_seed)
     rec = res["plaintext"].replace(SEP, "")
-    ref = plain[:len(rec)]
-    match = sum(a == b for a, b in zip(rec, ref)) / max(1, len(ref))
-    return {"match": match, "score": res["score"], "period": period,
-            "plaintext": plain, "recovered": rec}
+    ref = plain[: len(rec)]
+    match = sum(a == b for a, b in zip(rec, ref, strict=False)) / max(1, len(ref))
+    return {
+        "match": match,
+        "score": res["score"],
+        "period": period,
+        "plaintext": plain,
+        "recovered": rec,
+    }
 
 
-def greedy_recover(ct: str, period: int, top0: str, bottom0: str,
-                   iters: int = 20000, seed: int = 0) -> dict:
+def greedy_recover(
+    ct: str, period: int, top0: str, bottom0: str, iters: int = 20000, seed: int = 0
+) -> dict:
     """Greedy (accept-if-better) hill-climb of the two grids from a given start.
 
     This is the *validated core* capability: starting within a few swaps of the
@@ -517,8 +558,7 @@ def greedy_recover(ct: str, period: int, top0: str, bottom0: str,
             w[i], w[j] = w[j], w[i]
     top, bottom = "".join(bt), "".join(bb)
     pt = decrypt(ct, top, bottom, period)
-    return {"score": scorer.fitness(pt), "plaintext": pt,
-            "grids": (top, bottom), "period": period}
+    return {"score": scorer.fitness(pt), "plaintext": pt, "grids": (top, bottom), "period": period}
 
 
 _ENGLISH_REF = (
@@ -551,14 +591,13 @@ if __name__ == "__main__":
         for period in range(1, 13):
             ct = encrypt(pt, top_t, bot_t, period)
             back = decrypt(ct, top_t, bot_t, period).replace(SEP, "")
-            expect = _pad_to_even(pt).replace(SEP, "")[:len(back)]
+            expect = _pad_to_even(pt).replace(SEP, "")[: len(back)]
             # encrypt pads odd -> decrypt yields padded; compare on the padded form
             padded = _pad_to_even(pt)
             recov = decrypt(ct, top_t, bot_t, period)
             if recov != padded:
                 rt_ok = False
-                print(f"  FAIL plen={plen} period={period}: "
-                      f"{recov!r} != {padded!r}", flush=True)
+                print(f"  FAIL plen={plen} period={period}: {recov!r} != {padded!r}", flush=True)
                 break
         if not rt_ok:
             break
@@ -570,8 +609,7 @@ if __name__ == "__main__":
     # (radius ~3-4 swaps). This deterministic gate proves the cracker's climb is
     # correct; the blind gate below shows the basin is too far to reach from a
     # random start at N=272 (the honest recovery ceiling).
-    print("\n=== validated core: greedy recovers true grids from k perturbations ===",
-          flush=True)
+    print("\n=== validated core: greedy recovers true grids from k perturbations ===", flush=True)
     plain272 = only_letters(_ENGLISH_REF * 4)[:272]
     PERIOD = 7
     ct272 = encrypt(plain272, top_t, bot_t, PERIOD)
@@ -585,26 +623,32 @@ if __name__ == "__main__":
             w = t if rng.random() < 0.5 else b
             i, j = rng.randrange(27), rng.randrange(27)
             w[i], w[j] = w[j], w[i]
-        res = greedy_recover(ct272, PERIOD, "".join(t), "".join(b),
-                             iters=15000, seed=k)
+        res = greedy_recover(ct272, PERIOD, "".join(t), "".join(b), iters=15000, seed=k)
         rec = res["plaintext"].replace(SEP, "")
-        m = sum(a == b for a, b in zip(rec, plain272)) / len(plain272)
+        m = sum(a == b for a, b in zip(rec, plain272, strict=False)) / len(plain272)
         ok = m >= 0.99
         core_ok = core_ok and ok
-        print(f"  k={k} swaps: greedy fitness={res['score']:.3f} "
-              f"(target {target:.3f}) char-match={m:.0%} "
-              f"-> {'OK' if ok else 'STUCK'}", flush=True)
+        print(
+            f"  k={k} swaps: greedy fitness={res['score']:.3f} "
+            f"(target {target:.3f}) char-match={m:.0%} "
+            f"-> {'OK' if ok else 'STUCK'}",
+            flush=True,
+        )
     print(f"  CORE -> {'PASS' if core_ok else 'FAIL'}", flush=True)
     overall = overall and core_ok
 
     # ---- 3. Blind synthetic control at N=272 (the honest ceiling gate) ----
     R = int(sys.argv[1]) if len(sys.argv) > 1 else 24
     IT = int(sys.argv[2]) if len(sys.argv) > 2 else 8000
-    print(f"\n=== blind synthetic control: KRYPTOS-keyed digrafid, N=272, "
-          f"period={PERIOD}, R={R}, iters={IT} ===", flush=True)
+    print(
+        f"\n=== blind synthetic control: KRYPTOS-keyed digrafid, N=272, "
+        f"period={PERIOD}, R={R}, iters={IT} ===",
+        flush=True,
+    )
     t0 = time.time()
-    ctrl = control_recovery(PERIOD, 272, restarts=R, iters=IT,
-                            plant_seed=7, solve_seed=1, keyed=True)
+    ctrl = control_recovery(
+        PERIOD, 272, restarts=R, iters=IT, plant_seed=7, solve_seed=1, keyed=True
+    )
     dt = time.time() - t0
     pct = 100.0 * ctrl["match"]
     print(f"  elapsed         : {dt:.1f}s", flush=True)
@@ -614,16 +658,21 @@ if __name__ == "__main__":
     print(f"  recovered (head): {ctrl['recovered'][:64]}", flush=True)
     ctrl_ok = pct >= 90.0
     if not ctrl_ok:
-        print("  CONTROL CEILING: blind crack does NOT reach 90% at N=272 -- the "
-              "true-grid fitness basin (radius ~3-4 swaps) is unreachable from a "
-              "random start. Digrafid is UNFALSIFIABLE-BY-CRACKING at this length: "
-              "a null on the target ciphertext here is NOT a refutation.", flush=True)
-    print(f"  control -> {'PASS (>=90%)' if ctrl_ok else 'BELOW 90% (ceiling)'}",
-          flush=True)
+        print(
+            "  CONTROL CEILING: blind crack does NOT reach 90% at N=272 -- the "
+            "true-grid fitness basin (radius ~3-4 swaps) is unreachable from a "
+            "random start. Digrafid is UNFALSIFIABLE-BY-CRACKING at this length: "
+            "a null on the target ciphertext here is NOT a refutation.",
+            flush=True,
+        )
+    print(f"  control -> {'PASS (>=90%)' if ctrl_ok else 'BELOW 90% (ceiling)'}", flush=True)
 
-    print(f"\nSELF-TEST round-trip {'PASSED' if rt_ok else 'FAILED'}; "
-          f"core {'PASSED' if core_ok else 'FAILED'}; "
-          f"blind control recovery {pct:.1f}% "
-          f"({'>=90% gate' if ctrl_ok else 'ceiling'})", flush=True)
+    print(
+        f"\nSELF-TEST round-trip {'PASSED' if rt_ok else 'FAILED'}; "
+        f"core {'PASSED' if core_ok else 'FAILED'}; "
+        f"blind control recovery {pct:.1f}% "
+        f"({'>=90% gate' if ctrl_ok else 'ceiling'})",
+        flush=True,
+    )
     # Round-trip + climbable-basin core must pass; blind gate is reported honestly.
     sys.exit(0 if (rt_ok and core_ok) else 1)
