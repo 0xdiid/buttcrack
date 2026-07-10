@@ -6,6 +6,16 @@ and not yet published, so changes are grouped by milestone rather than release.
 
 ## Unreleased
 
+### Added (per-coset homogeneity diagnostic)
+- **`buttcrack.analysis.coset_homogeneity`**: for a period-`p` polyalphabetic, tests whether the
+  cosets are HOMOGENEOUS (all the same kind — e.g. every coset a 2-alphabet mix) or a mixture of
+  types (some clean-Caesar, some flat). Order-invariant (per-coset multisets only, so any
+  within-coset transposition is immaterial). Returns the per-coset IoC vector, an IoC-variance
+  homogeneity p-value calibrated against the best-fitting single type, and a per-coset best-Caesar
+  monogram LLR that flags a cleanly-keyed coset as an exploitable crib. Complements
+  `classify_coset_ioc` (which classifies the coset-IoC *mean*); this looks at the second moment and
+  the per-coset detail the mean hides. Pure-stdlib (no numpy dependency in the shipped path).
+
 ### Added (agent-reachable CLI for key-sourcing / validation / Hill-KPA + sibling, winding, and non-prose tools)
 A campaign consolidation pass: several powerful modules existed only as a library (no `butt`
 subcommand, so an agent driving the CLI could not reach them), and a few cross-cutting primitives

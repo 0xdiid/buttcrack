@@ -675,6 +675,127 @@ def classify_coset_ioc(
     return rows
 
 
+def _coset_ioc_norm(counts: Sequence[int]) -> float:
+    """Normalized (×26) coset IoC from a 26-bin count vector; ~1.73 EN, ~1.0 random."""
+    n = sum(counts)
+    if n < 2:
+        return 0.0
+    return 26.0 * sum(c * (c - 1) for c in counts) / (n * (n - 1))
+
+
+def coset_homogeneity(
+    letters: str,
+    period: int = 7,
+    *,
+    samples: int = 3000,
+    language: str = "english",
+    seed: int = 0,
+) -> dict[str, object]:
+    """Test whether a periodic cipher's cosets are HOMOGENEOUS or heterogeneous.
+
+    A period-``period`` polyalphabetic splits the text into ``period`` cosets (residue classes
+    mod ``period``). The *mean* coset IoC answers "how many alphabets per coset"; this answers a
+    different question the mean hides — are all cosets the SAME kind of coset, or a mixture of
+    types (some clean-Caesar, some 2-alphabet, some flat)? Heterogeneity matters because a single
+    cleanly-keyed coset yields a ~``n/period``-letter crib lattice that can break an otherwise
+    information-limited cipher.
+
+    Method (order-invariant — uses only per-coset multisets, so any within-coset transposition
+    leaves the result unchanged): compute the observed VARIANCE of the ``period`` per-coset IoCs,
+    then calibrate it against a homogeneous null — ``samples`` Monte-Carlo draws of ``period``
+    cosets ALL of the single best-fitting type (the type whose calibrated mean coset IoC is
+    closest to the observed mean), at the observed coset sizes. ``p_homogeneous`` is the fraction
+    of homogeneous draws whose IoC-variance ≥ observed; a small value means the spread is too wide
+    for identical cosets (genuine heterogeneity). Also reports, per coset, the best-Caesar monogram
+    log-likelihood ratio over uniform (``caesar_llr``) — a large value (≳8 nats at n≈22) flags a
+    coset that is a clean Caesar of the language and hence an exploitable crib.
+
+    Returns ``{"period", "coset_ic": [...], "mean", "var", "p_homogeneous", "null_type",
+    "caesar": [{"coset", "ic", "best_shift", "caesar_llr"}...]}``. Order-invariant; safe on
+    transposed ciphertext. Complements :func:`classify_coset_ioc` (which classifies the mean).
+    """
+    text = only_letters(letters.upper())
+    cosets = [text[r::period] for r in range(period)]
+    sizes = [len(c) for c in cosets]
+    obs_counts = [[c.count(chr(65 + a)) for a in range(26)] for c in cosets]
+    coset_ic = [_coset_ioc_norm(cc) for cc in obs_counts]
+    mean_ic = sum(coset_ic) / period
+    var_ic = sum((x - mean_ic) ** 2 for x in coset_ic) / period
+
+    if language == "english":
+        freqs = dict(ENGLISH_MONOGRAM_FREQ)
+    else:
+        from .scoring import get_scorer
+
+        sc = get_scorer("monograms", language)
+        freqs = {chr(65 + i): 1e-4 for i in range(26)}
+        for g, lp in sc.log_probs.items():
+            if len(g) == 1 and "A" <= g <= "Z":
+                freqs[g] = 10**lp
+    base = [freqs[chr(65 + a)] for a in range(26)]
+    tot = sum(base)
+    base = [b / tot for b in base]
+    rots = [[base[(a - s) % 26] for a in range(26)] for s in range(26)]
+    logrot = [[math.log(max(p, 1e-12)) for p in row] for row in rots]
+
+    # calibrated mean coset IoC of each candidate homogeneous type, at these sizes
+    rng = random.Random(seed)
+
+    def draw(kind: str, m: int) -> list[int]:
+        counts = [0] * 26
+        if kind == "caesar":
+            probs = rots[rng.randrange(26)]
+        elif kind == "mix2":
+            s1, s2 = rng.sample(range(26), 2)
+            probs = [(rots[s1][a] + rots[s2][a]) / 2 for a in range(26)]
+        elif kind == "mix3":
+            ss = rng.sample(range(26), 3)
+            probs = [sum(rots[s][a] for s in ss) / 3 for a in range(26)]
+        else:  # uniform
+            probs = [1 / 26] * 26
+        for a in rng.choices(range(26), probs, k=m):
+            counts[a] += 1
+        return counts
+
+    types = ("caesar", "mix2", "mix3", "uniform")
+    type_mean = {}
+    for kind in types:
+        vals = [_coset_ioc_norm(draw(kind, sizes[i % period])) for i in range(300)]
+        type_mean[kind] = sum(vals) / len(vals)
+    null_type = min(types, key=lambda k: abs(type_mean[k] - mean_ic))
+
+    ge = 0
+    for _ in range(samples):
+        ics = [_coset_ioc_norm(draw(null_type, sizes[c])) for c in range(period)]
+        m = sum(ics) / period
+        v = sum((x - m) ** 2 for x in ics) / period
+        ge += v >= var_ic
+    p_homog = ge / samples
+
+    caesar = []
+    for c in range(period):
+        cc = obs_counts[c]
+        lls = [sum(logrot[s][a] * cc[a] for a in range(26)) for s in range(26)]
+        best_s = max(range(26), key=lambda s: lls[s])
+        uni = -math.log(26) * sizes[c]
+        caesar.append({
+            "coset": c,
+            "ic": round(coset_ic[c], 3),
+            "best_shift": best_s,
+            "caesar_llr": round(lls[best_s] - uni, 2),
+        })
+
+    return {
+        "period": period,
+        "coset_ic": [round(x, 3) for x in coset_ic],
+        "mean": round(mean_ic, 3),
+        "var": round(var_ic, 4),
+        "p_homogeneous": round(p_homog, 3),
+        "null_type": null_type,
+        "caesar": caesar,
+    }
+
+
 @functools.cache
 def _projective_surjective_covectors(k: int) -> tuple[tuple[int, ...], ...]:
     """One representative per projective class of *surjective* k-covectors mod 26.

@@ -59,6 +59,40 @@ def test_classify_coset_ioc_picks_digraphic_band():
     assert top in ("playfair", "bifid", "four_square")
 
 
+def test_coset_homogeneity_flags_caesar_crib_cosets():
+    """The order-invariant per-coset diagnostic exposes cleanly-keyed (Caesar) cosets
+    via a high monogram LLR — the crib signal that breaks an otherwise flat cipher —
+    while a genuinely flat coset scores near zero. It also reports a homogeneity
+    p-value that is lower for a heterogeneous text than for a homogeneous one."""
+    import random
+
+    from buttcrack.analysis import coset_homogeneity
+
+    rng = random.Random(1)
+    freqs = [8, 1.5, 2.8, 4.3, 12.7, 2.2, 2, 6, 7, .15, .8, 4, 2.4,
+             6.7, 7.5, 1.9, .1, 6, 6.3, 9, 2.8, 1, 2.4, .15, 2, .07]
+    alpha = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    eng = "".join(rng.choices(alpha, weights=freqs, k=400))
+
+    # heterogeneous: cosets 0,1 are clean-Caesar English; 2..6 are flat random
+    het_cosets = [eng[c * 22:(c + 1) * 22] if c < 2 else "".join(rng.choices(alpha, k=22))
+                  for c in range(7)]
+    hetero = "".join(het_cosets[i % 7][i // 7] for i in range(153))
+    res = coset_homogeneity(hetero, 7, samples=1500, seed=3)
+    assert len(res["coset_ic"]) == 7
+    by_coset = {row["coset"]: row["caesar_llr"] for row in res["caesar"]}
+    # the two clean-Caesar cosets are exposed as exploitable cribs...
+    assert min(by_coset[0], by_coset[1]) > 8.0
+    # ...while the flat cosets do not read as English
+    assert max(by_coset[c] for c in range(2, 7)) < 5.0
+
+    # homogeneous control: every coset a clean Caesar of the same English -> higher p
+    hom_cosets = [eng[c * 22:(c + 1) * 22] for c in range(7)]
+    homog = "".join(hom_cosets[i % 7][i // 7] for i in range(153))
+    res_h = coset_homogeneity(homog, 7, samples=1500, seed=3)
+    assert res_h["p_homogeneous"] > res["p_homogeneous"]
+
+
 def test_period_inner_content_language_vs_flattened(plaintext):
     # The layer UNDER a detected period is either natural language (plain Vigenere/Quagmire,
     # peelable) or already flattened (a digraphic/polygraphic inner or a non-prose payload).
