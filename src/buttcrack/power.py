@@ -232,6 +232,4 @@ def dilute_plaintext(
     """
     letters = only_letters(plaintext)
     s = max(0.0, min(1.0, strength))
-    return "".join(
-        ch if rng.random() < s else rng.choice(alphabet) for ch in letters
-    )
+    return "".join(ch if rng.random() < s else rng.choice(alphabet) for ch in letters)

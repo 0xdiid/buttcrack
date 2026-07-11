@@ -778,12 +778,14 @@ def coset_homogeneity(
         lls = [sum(logrot[s][a] * cc[a] for a in range(26)) for s in range(26)]
         best_s = max(range(26), key=lambda s: lls[s])
         uni = -math.log(26) * sizes[c]
-        caesar.append({
-            "coset": c,
-            "ic": round(coset_ic[c], 3),
-            "best_shift": best_s,
-            "caesar_llr": round(lls[best_s] - uni, 2),
-        })
+        caesar.append(
+            {
+                "coset": c,
+                "ic": round(coset_ic[c], 3),
+                "best_shift": best_s,
+                "caesar_llr": round(lls[best_s] - uni, 2),
+            }
+        )
 
     return {
         "period": period,

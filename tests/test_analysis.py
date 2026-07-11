@@ -69,14 +69,41 @@ def test_coset_homogeneity_flags_caesar_crib_cosets():
     from buttcrack.analysis import coset_homogeneity
 
     rng = random.Random(1)
-    freqs = [8, 1.5, 2.8, 4.3, 12.7, 2.2, 2, 6, 7, .15, .8, 4, 2.4,
-             6.7, 7.5, 1.9, .1, 6, 6.3, 9, 2.8, 1, 2.4, .15, 2, .07]
+    freqs = [
+        8,
+        1.5,
+        2.8,
+        4.3,
+        12.7,
+        2.2,
+        2,
+        6,
+        7,
+        0.15,
+        0.8,
+        4,
+        2.4,
+        6.7,
+        7.5,
+        1.9,
+        0.1,
+        6,
+        6.3,
+        9,
+        2.8,
+        1,
+        2.4,
+        0.15,
+        2,
+        0.07,
+    ]
     alpha = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
     eng = "".join(rng.choices(alpha, weights=freqs, k=400))
 
     # heterogeneous: cosets 0,1 are clean-Caesar English; 2..6 are flat random
-    het_cosets = [eng[c * 22:(c + 1) * 22] if c < 2 else "".join(rng.choices(alpha, k=22))
-                  for c in range(7)]
+    het_cosets = [
+        eng[c * 22 : (c + 1) * 22] if c < 2 else "".join(rng.choices(alpha, k=22)) for c in range(7)
+    ]
     hetero = "".join(het_cosets[i % 7][i // 7] for i in range(153))
     res = coset_homogeneity(hetero, 7, samples=1500, seed=3)
     assert len(res["coset_ic"]) == 7
@@ -87,7 +114,7 @@ def test_coset_homogeneity_flags_caesar_crib_cosets():
     assert max(by_coset[c] for c in range(2, 7)) < 5.0
 
     # homogeneous control: every coset a clean Caesar of the same English -> higher p
-    hom_cosets = [eng[c * 22:(c + 1) * 22] for c in range(7)]
+    hom_cosets = [eng[c * 22 : (c + 1) * 22] for c in range(7)]
     homog = "".join(hom_cosets[i % 7][i // 7] for i in range(153))
     res_h = coset_homogeneity(homog, 7, samples=1500, seed=3)
     assert res_h["p_homogeneous"] > res["p_homogeneous"]
