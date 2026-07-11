@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import random
 
+import pytest
+
 from buttcrack import nulls
 from buttcrack.text import only_letters
 
@@ -44,7 +46,8 @@ CT = _vigenere(_PLAIN, "LEMON")  # period-5 polyalphabetic
 
 def test_within_coset_null_leaves_coset_ioc_invariant():
     # The honest null preserves each coset's multiset, so coset-IC at the period is
-    # EXACTLY invariant -> it cannot manufacture a "signal". p must be ~1 (not significant).
+    # invariant -> it cannot manufacture a "signal". The spread is float-summation noise
+    # (~1e-15 on a ~1.45 statistic), so assert near-zero rather than bit-exact equality.
     res = nulls.null_test(
         CT,
         lambda s: _coset_ioc(s, PERIOD),
@@ -52,10 +55,10 @@ def test_within_coset_null_leaves_coset_ioc_invariant():
         trials=200,
         rng=random.Random(0),
     )
-    assert res.null_sd == 0.0
-    assert res.obs == res.null_mean  # invariant
+    assert res.null_sd == pytest.approx(0.0, abs=1e-9)
+    assert res.obs == pytest.approx(res.null_mean, abs=1e-9)
     assert not res.significant
-    assert res.p_value == 1.0
+    assert res.p_value > 0.5  # not a signal (nulls are the same value up to float noise)
 
 
 def test_permutation_null_detects_real_period():
@@ -76,9 +79,13 @@ def test_permutation_null_detects_real_period():
 def test_block_shuffle_preserves_mod_block_cosets():
     rng = random.Random(2)
     null = nulls.block_shuffle(PERIOD)
-    before = _coset_ioc(CT, PERIOD)
-    after = _coset_ioc("".join(null(CT, rng)), PERIOD)
-    assert after == before  # mod-block coset multisets are invariant under block shuffle
+    shuffled = "".join(null(CT, rng))
+    # A block-of-PERIOD shuffle keeps each within-block offset in its residue class, so
+    # every mod-PERIOD coset's letter multiset is preserved exactly (integer-level check).
+    for r in range(PERIOD):
+        assert sorted(shuffled[r::PERIOD]) == sorted(CT[r::PERIOD])
+    # ...and therefore coset-IoC at PERIOD is invariant (up to float-summation noise).
+    assert _coset_ioc(shuffled, PERIOD) == pytest.approx(_coset_ioc(CT, PERIOD))
 
 
 def test_permutation_preserves_multiset():
