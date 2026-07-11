@@ -10,9 +10,16 @@ from __future__ import annotations
 
 import functools
 import math
+from collections.abc import Iterable
 from importlib import resources
+from typing import Any
 
 from .text import only_letters
+
+try:  # optional acceleration only; the package itself stays dependency-free
+    import numpy as _np
+except Exception:  # pragma: no cover - numpy is present in dev/test
+    _np = None  # type: ignore[assignment]  # optional-dependency fallback sentinel
 
 # Pseudo-count (in n-gram windows) for shrinking short-text confidence toward
 # the random baseline. Larger => more skeptical of short inputs. At 12, a clean
@@ -277,3 +284,132 @@ def chi_squared(letters: str) -> float:
         expected = ENGLISH_MONOGRAM_FREQ[chr(65 + i)] * n
         total += (counts[i] - expected) ** 2 / expected if expected else 0.0
     return total
+
+
+# --- vectorized batch scoring (optional numpy accelerator) -------------------
+
+#: Largest ``26**n`` for which a dense n-gram LUT is built (26**5 ≈ 11.9M cells,
+#: ~95 MB as float64). Beyond this the batch scorer falls back to per-row scoring.
+_MAX_DENSE_LUT = 26**5
+
+
+def text_to_ordinals(text: str) -> list[int]:
+    """A-Z letters of ``text`` as 0..25 ordinals (non-letters dropped)."""
+    return [ord(c) - 65 for c in only_letters(text)]
+
+
+class BatchNgramScorer:
+    """Score many equal-length candidates at once, matching :meth:`NgramScorer.score`.
+
+    Cryptanalytic search loops (brute force, hill-climbing, annealing) evaluate the
+    same quadgram log-probability sum over thousands of candidate plaintexts per
+    second; calling :meth:`NgramScorer.score` — a Python ``dict.get`` per window — is
+    the bottleneck. This wraps a scorer's table as a dense ``26**n`` lookup array so a
+    whole batch of candidates is scored by array-indexing and a summed sliding window.
+
+    ``score_batch`` reproduces :meth:`NgramScorer.score` **exactly** (same floor for
+    unseen n-grams, same short-text branch), so a solver can hunt with the fast path
+    and report scores that agree bit-for-bit with the rest of buttcrack. When numpy is
+    absent — or the model is too large for a dense LUT (quint/hexagrams) — it falls
+    back transparently to per-row scoring, so callers never need to branch on it.
+    """
+
+    def __init__(self, scorer: NgramScorer):
+        self.scorer = scorer
+        self.n = scorer.n
+        self.floor = scorer.floor
+        self._lut = None
+        if _np is not None and 26**self.n <= _MAX_DENSE_LUT:
+            lut = _np.full(26**self.n, scorer.floor, dtype=_np.float64)
+            for gram, lp in scorer.log_probs.items():
+                idx = 0
+                for ch in gram:
+                    idx = idx * 26 + (ord(ch) - 65)
+                lut[idx] = lp
+            self._lut = lut
+
+    @property
+    def vectorized(self) -> bool:
+        """True when the fast numpy LUT path is active (else the per-row fallback)."""
+        return self._lut is not None
+
+    def score_batch(self, batch: Any) -> list[float]:
+        """Total log-probability of each row, matching :meth:`NgramScorer.score`.
+
+        ``batch`` is a rectangular ``(B, L)`` of 0..25 ordinals — a numpy array, or any
+        sequence of equal-length int sequences. Returns a list of ``B`` floats (the
+        vectorized path also accepts and is happiest with a numpy array). Rows shorter
+        than the n-gram size ``n`` get ``floor * max(1, L)``, exactly as the scalar scorer.
+        """
+        n = self.n
+        if self._lut is not None:
+            arr = _np.asarray(batch)
+            if arr.ndim == 1:
+                arr = arr[None, :]
+            B, length = arr.shape
+            if length < n:
+                return [self.floor * max(1, length)] * B
+            idx = arr[:, 0 : length - n + 1].astype(_np.int64)
+            for k in range(1, n):
+                idx = idx * 26 + arr[:, k : length - n + 1 + k]
+            return self._lut[idx].sum(axis=1).tolist()
+        # Fallback: score each row via the scalar scorer.
+        rows = list(batch)
+        out: list[float] = []
+        for row in rows:
+            out.append(self.scorer.score("".join(chr(65 + int(o)) for o in row)))
+        return out
+
+    def score_texts(self, texts: Iterable[str]) -> list[float]:
+        """Total log-probability of each text (any lengths), matching the scalar scorer.
+
+        Convenience wrapper that normalizes each string to A-Z ordinals and groups equal
+        lengths so the vectorized path still applies within each group.
+        """
+        items = [text_to_ordinals(t) for t in texts]
+        scores: list[float | None] = [None] * len(items)
+        by_len: dict[int, list[int]] = {}
+        for i, ords in enumerate(items):
+            by_len.setdefault(len(ords), []).append(i)
+        for length, idxs in by_len.items():
+            if self._lut is not None and length >= self.n:
+                mat = _np.array([items[i] for i in idxs], dtype=_np.int64)
+                for pos, s in zip(idxs, self.score_batch(mat), strict=True):
+                    scores[pos] = s
+            else:
+                for i in idxs:
+                    scores[i] = self.scorer.score("".join(chr(65 + o) for o in items[i]))
+        return [s if s is not None else self.floor for s in scores]
+
+    def fitness_batch(self, batch: Any) -> list[float]:
+        """Entropy-weighted fitness of each row, matching :meth:`NgramScorer.fitness`.
+
+        The AZdecrypt-style objective for hill-climbing: the mean n-gram log-prob shifted
+        above the floor, scaled by the row's letter-entropy fraction, so degenerate
+        low-entropy "solutions" are penalized. Rows too short to hold a window score 0.0.
+        """
+        n = self.n
+        if self._lut is not None:
+            arr = _np.asarray(batch)
+            if arr.ndim == 1:
+                arr = arr[None, :]
+            B, length = arr.shape
+            windows = length - n + 1
+            if windows <= 0:
+                return [0.0] * B
+            totals = _np.asarray(self.score_batch(arr))
+            avg = totals / windows
+            counts = _np.zeros((B, 26), dtype=_np.int64)
+            _np.add.at(counts, (_np.arange(B)[:, None], arr), 1)
+            p = counts / length
+            with _np.errstate(divide="ignore", invalid="ignore"):
+                terms = _np.where(p > 0, -p * _np.log2(p), 0.0)
+            H = terms.sum(axis=1)
+            return ((avg - self.floor) * (H / ENGLISH_LETTER_ENTROPY)).tolist()
+        return [self.scorer.fitness("".join(chr(65 + int(o)) for o in row)) for row in batch]
+
+
+@functools.cache
+def get_batch_scorer(name: str = "quadgrams", lang: str = "english") -> BatchNgramScorer:
+    """Cached :class:`BatchNgramScorer` over the same tables as :func:`get_scorer`."""
+    return BatchNgramScorer(get_scorer(name, lang))

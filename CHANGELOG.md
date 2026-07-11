@@ -6,6 +6,49 @@ and not yet published, so changes are grouped by milestone rather than release.
 
 ## Unreleased
 
+### Added (campaign-derived primitives lifted into the toolkit)
+A consolidation pass over the PK working directory and the community effort: several techniques
+were hand-rolled across dozens of throwaway scripts (and independently re-derived by multiple
+solvers). The general, PK-agnostic core of each is now a first-class, tested module.
+
+- **`buttcrack.scoring.BatchNgramScorer`** — a vectorized n-gram scorer: a dense `26**n`
+  log-probability LUT + array scoring for whole batches of candidates at once, reproducing
+  `NgramScorer.score` **exactly** (same floor, same short-text branch) so search loops can hunt on
+  the fast path and report scores that agree with the rest of the toolkit. Optional numpy
+  accelerator with a transparent pure-Python fallback; ~67 campaign scripts had each rebuilt this.
+  `get_batch_scorer()` caches one over the bundled tables.
+- **`buttcrack.nulls`** (new) — structure-preserving null models + a look-elsewhere correction, the
+  single most-converged-upon primitive across the community effort. `within_coset`, `block_shuffle`,
+  `permutation`, `iid_empirical`, `iid_uniform` each destroy exactly one structure and preserve the
+  rest; `null_test` scores any statistic against any of them (an honest max-over-search null falls
+  out for free when the statistic performs the search's max internally); `scan_test` corrects the
+  multiplicity of scanning a statistic over many periods/lags (scan-max and family-max p-values).
+  Builds on `windings.coset_preserving_shuffle`; pure-stdlib.
+- **`buttcrack.ciphers.keystream`** (new cipher family) — self-generating additive keystreams over
+  Z26: `keystream`/`lfsr` (linear recurrence `k[i]=Σ c_j·k[i-1-j]`, of which lagged-Fibonacci /
+  chain-addition is the `1,1` case) and `lcg` (`k[i+1]=a·k[i]+c`), each with Vigenere/Beaufort/
+  variant combiners. Blind cracks brute the tiny keyspaces (`26**4` for an order-2 recurrence,
+  `26**3` for an LCG) — a fixed coefficient set makes the recurrence linear in the seed, so a whole
+  batch of seeds is one matrix multiply — and score with `BatchNgramScorer`. Order-2 blind recovery
+  runs in well under a second; higher orders take fixed coefficients or a timeout-bounded sample.
+- **`buttcrack.construction`** (new) — forward-simulation model identification: simulate many
+  instances of each candidate construction (a cipher family encrypting fresh English under random
+  keys), measure a multi-statistic **dial vector** (monogram/digraph IoC, entropy, coset-IoC at
+  several periods) on each, and rank the real ciphertext's fit — *refuting* families that provably
+  cannot manufacture the observed dials. Complements the discriminant-based `cipher_id`/`diagnose`
+  with a generative view; a default bank spans language / periodic-polyalphabetic / transposition /
+  monoalphabetic / digraphic / running-key / keystream, and callers can extend it.
+- **`buttcrack.power`** (new) — objective power calibration, the prior question to
+  `validate.positive_control`: `separation` (signal-vs-null z, Cohen's d, rank AUC),
+  `powerless_objective` (flags an objective that is near-constant across inputs — the silent bug
+  where a "solver" optimizes a flat/key-invariant score), and `power_curve` (sweep a signal-strength
+  knob, e.g. `dilute_plaintext`, to find the SNR at which the objective and its search turn on).
+- **`buttcrack.wordlm`** (new) — word-level tools where character n-grams fall short. `word_segment`
+  gives the best dictionary-word segmentation with a per-letter score and a `long_coverage` signal
+  that catches n-gram "salad" (fluent letter strings that are not words); `word_tiling` reconstructs
+  plaintext from a *bag of letters* (the exact-cover / anagram step for per-column or per-coset
+  multisets a transposition leaves), the number of full tilings being a determinacy/unicity signal.
+
 ### Added (per-coset homogeneity diagnostic)
 - **`buttcrack.analysis.coset_homogeneity`**: for a period-`p` polyalphabetic, tests whether the
   cosets are HOMOGENEOUS (all the same kind — e.g. every coset a 2-alphabet mix) or a mixture of

@@ -33,6 +33,7 @@ from .homophonic import Homophonic
 from .incomplete_columnar import IncompleteColumnar
 from .interrupted_key import InterruptedKey
 from .key_phrase import KeyPhrase
+from .keystream import LcgKeystream, LinearRecurrenceKeystream
 from .monome_dinome import MonomeDinome
 from .morbit import Morbit
 from .myszkowski import Myszkowski
@@ -140,6 +141,8 @@ ALL_CIPHERS: tuple[type[Cipher], ...] = (
     Bazeries,
     Gromark,
     PeriodicGromark,
+    LinearRecurrenceKeystream,
+    LcgKeystream,
     Ragbaby,
     Condi,
     Substitution,
