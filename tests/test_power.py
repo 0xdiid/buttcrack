@@ -94,7 +94,11 @@ def test_power_curve_records_recovery_rate():
         return scorer.score(letters) / max(1, len(letters)) > -4.5
 
     curve = power.power_curve(
-        make_signal, objective, [0.0, 1.0], trials=10, rng=random.Random(4),
+        make_signal,
+        objective,
+        [0.0, 1.0],
+        trials=10,
+        rng=random.Random(4),
         recover_fn=recovered,
     )
     assert curve[0].recover_rate == 0.0

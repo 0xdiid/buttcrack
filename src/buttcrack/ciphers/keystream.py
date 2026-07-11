@@ -305,9 +305,7 @@ class LinearRecurrenceKeystream(Cipher):
         else:
             partial = True  # too large to enumerate: sample coeff sets within budget
             n_sample = max(1, budget // coeff_space)
-            coeff_sets = [
-                tuple(rng.randrange(MOD) for _ in range(order)) for _ in range(n_sample)
-            ]
+            coeff_sets = [tuple(rng.randrange(MOD) for _ in range(order)) for _ in range(n_sample)]
 
         seeds = _all_vectors(order)
         for coeffs in coeff_sets:

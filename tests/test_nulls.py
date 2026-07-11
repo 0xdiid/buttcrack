@@ -46,8 +46,11 @@ def test_within_coset_null_leaves_coset_ioc_invariant():
     # The honest null preserves each coset's multiset, so coset-IC at the period is
     # EXACTLY invariant -> it cannot manufacture a "signal". p must be ~1 (not significant).
     res = nulls.null_test(
-        CT, lambda s: _coset_ioc(s, PERIOD), nulls.within_coset(PERIOD),
-        trials=200, rng=random.Random(0),
+        CT,
+        lambda s: _coset_ioc(s, PERIOD),
+        nulls.within_coset(PERIOD),
+        trials=200,
+        rng=random.Random(0),
     )
     assert res.null_sd == 0.0
     assert res.obs == res.null_mean  # invariant
@@ -59,8 +62,11 @@ def test_permutation_null_detects_real_period():
     # Against a whole-message shuffle (which destroys the period), the elevated
     # coset-IC IS a real signal -> highly significant.
     res = nulls.null_test(
-        CT, lambda s: _coset_ioc(s, PERIOD), nulls.permutation,
-        trials=300, rng=random.Random(1),
+        CT,
+        lambda s: _coset_ioc(s, PERIOD),
+        nulls.permutation,
+        trials=300,
+        rng=random.Random(1),
     )
     assert res.obs > res.null_mean
     assert res.z > 3
@@ -85,8 +91,13 @@ def test_permutation_preserves_multiset():
 def test_scan_test_finds_true_period():
     periods = list(range(2, 13))
     res = nulls.scan_test(
-        CT, lambda s: [_coset_ioc(s, p) for p in periods], nulls.permutation, periods,
-        trials=300, rng=random.Random(4), family=True,
+        CT,
+        lambda s: [_coset_ioc(s, p) for p in periods],
+        nulls.permutation,
+        periods,
+        trials=300,
+        rng=random.Random(4),
+        family=True,
     )
     assert res.argmax in (PERIOD, 2 * PERIOD)  # period or its harmonic
     assert res.scan_max_p < 0.05  # look-elsewhere-corrected, still significant
@@ -98,8 +109,12 @@ def test_scan_test_random_text_not_significant():
     rand = "".join(chr(65 + rng.randrange(26)) for _ in range(len(CT)))
     periods = list(range(2, 13))
     res = nulls.scan_test(
-        rand, lambda s: [_coset_ioc(s, p) for p in periods], nulls.permutation, periods,
-        trials=300, rng=random.Random(6),
+        rand,
+        lambda s: [_coset_ioc(s, p) for p in periods],
+        nulls.permutation,
+        periods,
+        trials=300,
+        rng=random.Random(6),
     )
     assert res.scan_max_p > 0.05  # no real period -> not significant after correction
 
@@ -115,7 +130,10 @@ def test_honest_max_over_search_null():
 
 def test_add_one_smoothing_never_zero():
     res = nulls.null_test(
-        CT, lambda s: _coset_ioc(s, PERIOD), nulls.permutation,
-        trials=50, rng=random.Random(8),
+        CT,
+        lambda s: _coset_ioc(s, PERIOD),
+        nulls.permutation,
+        trials=50,
+        rng=random.Random(8),
     )
     assert res.p_value >= 1 / (res.trials + 1)
