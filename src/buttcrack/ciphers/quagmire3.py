@@ -14,8 +14,14 @@ Construction (following the ACA description)::
        cipher row.
     2. An indicator keyword fixes the period (= its length). Each indicator letter
        generates one column's cipher row: rotate the keyed alphabet so the
-       indicator letter lands in the column of an "alignment" letter of the header
-       (ACA default alignment letter: ``A``).
+       indicator letter lands in the column of an "alignment" letter of the header.
+       When no alignment letter is given it defaults to the keyed alphabet's FIRST
+       letter (``header[0]``) — i.e. a plain Vigenere in the keyed alphabet
+       (indicator letter == first keyed letter is the identity column). This matches
+       the solver, which emits Q3 keys as ``KEYWORD/INDICATOR/<first-keyed-letter>``.
+       Pass an explicit third field to force a different alignment (e.g. the ACA
+       ``A`` setting). For the classic ``AUTOMOBILE/HIGHWAY`` vector ``header[0]``
+       is already ``A``, so the default is unchanged there.
 
 Encrypt: for plaintext letter ``P`` in column ``j`` (j cycles 0..period-1), find
 the POSITION of ``P`` in the keyed plaintext header, then emit the letter at that
@@ -29,11 +35,12 @@ reciprocal.
 
 KEY FORMAT (one ``--key`` string, slash-separated)::
 
-    "ALPHABETKEYWORD/INDICATORKEYWORD"            -> alignment letter defaults to A
+    "ALPHABETKEYWORD/INDICATORKEYWORD"            -> alignment = keyed alphabet's first letter
     "ALPHABETKEYWORD/INDICATORKEYWORD/ALIGN"      -> explicit alignment letter ALIGN
 
-The published example (see tests) is keyed alphabet AUTOMOBILE, indicator HIGHWAY,
-alignment A -> key string "AUTOMOBILE/HIGHWAY".
+The published example (see tests) is keyed alphabet AUTOMOBILE, indicator HIGHWAY
+-> key string "AUTOMOBILE/HIGHWAY" (header[0] == A). For a keyword that does not
+start with A, e.g. "MONARCHY/SENTINEL", the alignment defaults to M (header[0]).
 """
 
 from __future__ import annotations
@@ -61,19 +68,29 @@ def keyed_alphabet(keyword: str) -> str:
     return "".join(seen)
 
 
-def _parse_key(key: str) -> tuple[str, str, str]:
-    """Return (alphabet_keyword_letters, indicator_letters, alignment_letter)."""
+def _parse_key(key: str) -> tuple[str, str, str | None]:
+    """Return (alphabet_keyword_letters, indicator_letters, alignment_letter_or_None).
+
+    ``None`` alignment means "default to the keyed alphabet's first letter", which the
+    caller resolves once it has built the header (see :func:`_resolve_align`).
+    """
     parts = key.split("/")
     if len(parts) < 2:
         raise ValueError("quagmire3 key must be 'ALPHABETKEYWORD/INDICATORKEYWORD[/ALIGN]'")
     alpha_kw = only_letters(parts[0])
     indicator = only_letters(parts[1])
-    align = only_letters(parts[2]) if len(parts) >= 3 and only_letters(parts[2]) else "A"
+    align_field = only_letters(parts[2]) if len(parts) >= 3 else ""
+    align = align_field[0] if align_field else None
     if not alpha_kw:
         raise ValueError("quagmire3 alphabet keyword must contain letters")
     if not indicator:
         raise ValueError("quagmire3 indicator keyword must contain letters")
-    return alpha_kw, indicator, align[0]
+    return alpha_kw, indicator, align
+
+
+def _resolve_align(align: str | None, header: str) -> str:
+    """Alignment letter, defaulting to the keyed alphabet's first letter (PK convention)."""
+    return align if align else header[0]
 
 
 def _cipher_rows(header: str, indicator: str, align: str) -> list[str]:
@@ -122,13 +139,13 @@ class QuagmireIII(Cipher):
     def encode(self, text: str, key: str) -> str:
         alpha_kw, indicator, align = _parse_key(key)
         header = keyed_alphabet(alpha_kw)
-        rows = _cipher_rows(header, indicator, align)
+        rows = _cipher_rows(header, indicator, _resolve_align(align, header))
         return _encode_letters(only_letters(text), header, rows)
 
     def decode(self, text: str, key: str) -> str:
         alpha_kw, indicator, align = _parse_key(key)
         header = keyed_alphabet(alpha_kw)
-        rows = _cipher_rows(header, indicator, align)
+        rows = _cipher_rows(header, indicator, _resolve_align(align, header))
         return reflow(text, _decode_letters(only_letters(text), header, rows))
 
     def crack(
