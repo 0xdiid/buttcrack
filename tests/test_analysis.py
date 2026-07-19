@@ -523,3 +523,47 @@ def test_bounded_surjective_covectors_guarded():
                 g = math.gcd(g, e % 26)
             assert math.gcd(g, 26) == 1
             assert sum(1 for e in v if e) >= 2
+
+
+def test_heldout_stationarity_no_false_positive_on_flattener():
+    """The debiased held-out test must NOT read a strong FLATTENER as non-stationary
+    (the naive unflattened comparison does), yet must rank a genuine non-stationary
+    key below the flattened-stationary trap at sufficient length."""
+    import random
+
+    from buttcrack.analysis import heldout_stationarity
+
+    rng = random.Random(11)
+    # A flat-ish English-frequency alphabet (removes natural topic-drift confound).
+    freq = (
+        "EEEEEEEEEEEETTTTTTTTTAAAAAAAAOOOOOOOIIIIIIINNNNNN"
+        "SSSSSSHHHHHRRRRRDDDDLLLCCCUUMMWWFFGGYYPPBVKJXQZ"
+    )
+
+    def rtext(n):
+        return "".join(rng.choice(freq) for _ in range(n))
+
+    def vig(pt, key):
+        return "".join(
+            chr((ord(pt[i]) - 65 + ord(key[i % len(key)]) - 65) % 26 + 65) for i in range(len(pt))
+        )
+
+    def flatten(pt):  # add a 2-value additive selector (a strong flattener)
+        return "".join(
+            chr((ord(pt[i]) - 65 + (3 if rng.random() < 0.5 else 0)) % 26 + 65)
+            for i in range(len(pt))
+        )
+
+    n = 2000
+    pt = rtext(n)
+    half = n // 2
+    # Flattened-stationary TRAP: period-7 Vigenere over a 2-value-flattened payload.
+    trap = vig(flatten(pt), "CIPHERS")
+    r_trap = heldout_stationarity(trap, period=7, samples=150)
+    assert r_trap["nonstationary"] is False  # flattener alone must not trip it
+    assert r_trap["z"] > -3.0
+
+    # Strong non-stationary: a different key in each half must transfer worse than the trap.
+    nonstat = vig(pt[:half], "AAAAAAA") + vig(pt[half:], "NQXMKZU")
+    r_ns = heldout_stationarity(nonstat, period=7, samples=150)
+    assert r_ns["z"] < r_trap["z"]

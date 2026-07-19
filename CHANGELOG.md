@@ -11,6 +11,22 @@ A consolidation pass over the PK working directory and the community effort: sev
 were hand-rolled across dozens of throwaway scripts (and independently re-derived by multiple
 solvers). The general, PK-agnostic core of each is now a first-class, tested module.
 
+- **`buttcrack.ciphers.progressive_key` keyless recovery** — the Progressive Key `crack` no longer
+  needs a supplied keyword. The progression is recovered *before* the keyword: undoing the
+  per-group progression re-aligns every group onto ONE keyword cipher, so the correct
+  `(period, base, progression)` snaps the de-drifted columns from flat back to peaked — rankable by
+  column IoC alone, cheaply, no dictionary word required. The top few triples are then fully solved
+  (keyword by per-column English fit) and scored, escaping the coupled keyword+progression search
+  that previously made the cipher un-crackable blind. `crack` with no keyword hint now returns
+  keyless candidates (`meta.keyless=True`) instead of `[]`; `max_period`/`prefilter` tune it.
+- **`buttcrack.analysis.heldout_stationarity`** — a held-out transfer test for whether a period-``p``
+  additive key is *stationary* across the text: fit the per-coset shifts on the first half, then
+  measure how well they pool the held-out remainder. It is z-scored against a **within-coset-shuffle**
+  null, which preserves each coset's multiset (hence any flattener's marginal) — the flattener-matched
+  control a naive comparison lacks. Without it, a strong flattener alone depresses transfer and reads
+  as spurious "non-stationarity"; with it, the flattener is correctly not flagged. Power scales with
+  length, so at short *n* the test is (honestly) inconclusive rather than false-positive. Complements
+  `ioc_decay` (which detects marginal-IoC drift, not shift-key transfer).
 - **`buttcrack.scoring.BatchNgramScorer`** — a vectorized n-gram scorer: a dense `26**n`
   log-probability LUT + array scoring for whole batches of candidates at once, reproducing
   `NgramScorer.score` **exactly** (same floor, same short-text branch) so search loops can hunt on
