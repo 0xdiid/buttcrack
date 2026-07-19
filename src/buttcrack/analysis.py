@@ -2283,3 +2283,100 @@ def analyze(text: str, *, top_ngrams: int = 10, with_contacts: bool = False) -> 
     if with_contacts:
         report["contacts"] = contacts(text)
     return report
+
+
+def heldout_stationarity(
+    letters: str,
+    *,
+    period: int = 7,
+    alphabet: str = "STANDARD",
+    split: float = 0.5,
+    samples: int = 300,
+    seed: int = 20250719,
+) -> dict[str, float | int | bool]:
+    """Test whether a period-``period`` additive key is STATIONARY across the text.
+
+    Fit per-coset additive shifts on the first ``split`` fraction (aligning each coset to
+    coset 0), apply them to the held-out remainder, and measure the pooled (superimposed)
+    IoC -- the *transfer power*. A stationary shift key transfers (held-out cosets re-align,
+    pooled IoC stays high); a key that drifts or changes across the text does not.
+
+    The verdict is z-scored against a WITHIN-COSET-SHUFFLE null: shuffling each coset's
+    letters preserves its multiset (hence any flattener's marginal) but makes the two halves
+    interchangeable, so the null is exactly "what transfer looks like if the key IS stationary,
+    at this flattening level". This is the crucial control: a strong flattener depresses
+    transfer ON ITS OWN, so comparing raw transfer to *unflattened* stationary text yields a
+    FALSE "non-stationary" verdict. Only ``z`` well below 0 vs this null is genuine
+    non-stationarity beyond the flattener.
+
+    Statistical power scales with length: at short n (a few hundred letters) even a strongly
+    non-stationary key barely moves ``z`` (the within-coset-shuffle null itself mimics a
+    drifting key), and only by ~n>=2000 does a clean split reach ``z<=-3``. So a null result
+    at short n establishes neither stationarity nor its absence -- its chief value is guarding
+    against the *false* non-stationary verdict the naive (unflattened) comparison produces.
+
+    ``alphabet`` is the ring the additive shifts are measured in. Returns
+    ``{"period", "transfer", "null_mean", "null_sd", "z", "nonstationary"}``;
+    ``nonstationary`` is True only when ``z <= -3``.
+    """
+    ring = _alphabet(alphabet)
+    ring_idx = {c: i for i, c in enumerate(ring)}
+    idx = [ring_idx[c] for c in only_letters(letters)]
+    n = len(idx)
+    split_idx = int(round(n * split))
+    if n < 4 * period or split_idx < period or n - split_idx < period:
+        return {
+            "period": period,
+            "transfer": 0.0,
+            "null_mean": 0.0,
+            "null_sd": 0.0,
+            "z": 0.0,
+            "nonstationary": False,
+        }
+
+    def _ioc26(counts: list[int]) -> float:
+        m = sum(counts)
+        return 26.0 * sum(k * (k - 1) for k in counts) / (m * (m - 1)) if m > 1 else 0.0
+
+    def _transfer(seq: list[int]) -> float:
+        # fit per-coset shifts on [:split] by aligning each coset to coset 0
+        fit_hist = [[0] * 26 for _ in range(period)]
+        for i in range(split_idx):
+            fit_hist[i % period][seq[i]] += 1
+        anchor = fit_hist[0]
+        shifts = [0] * period
+        for c in range(1, period):
+            best_s, best_v = 0, -1.0
+            for s in range(26):
+                v = sum(anchor[x] * fit_hist[c][(x + s) % 26] for x in range(26))
+                if v > best_v:
+                    best_s, best_v = s, v
+            shifts[c] = best_s
+        # apply fitted shifts to the held-out half, pool, IoC
+        pooled = [0] * 26
+        for i in range(split_idx, n):
+            pooled[(seq[i] - shifts[i % period]) % 26] += 1
+        return _ioc26(pooled)
+
+    observed = _transfer(idx)
+    rng = random.Random(seed)
+    cosets = [idx[c::period] for c in range(period)]
+    null: list[float] = []
+    for _ in range(samples):
+        shuffled = idx[:]
+        for c in range(period):
+            col = cosets[c][:]
+            rng.shuffle(col)
+            shuffled[c::period] = col
+        null.append(_transfer(shuffled))
+    mu = sum(null) / len(null)
+    sd = (sum((v - mu) ** 2 for v in null) / len(null)) ** 0.5 or 1e-9
+    z = (observed - mu) / sd
+    return {
+        "period": period,
+        "transfer": round(observed, 4),
+        "null_mean": round(mu, 4),
+        "null_sd": round(sd, 4),
+        "z": round(z, 2),
+        "nonstationary": z <= -3.0,
+    }

@@ -148,6 +148,113 @@ def _transform(
     return "".join(out)
 
 
+# English letter log-frequencies (A-Z), for the per-column keyword solve.
+_ENG_LOGFREQ = [
+    -1.074,
+    -2.264,
+    -1.703,
+    -1.583,
+    -0.895,
+    -1.891,
+    -1.912,
+    -1.393,
+    -1.135,
+    -3.204,
+    -2.617,
+    -1.481,
+    -1.660,
+    -1.267,
+    -1.126,
+    -1.702,
+    -3.591,
+    -1.335,
+    -1.213,
+    -1.055,
+    -1.556,
+    -2.394,
+    -2.109,
+    -3.155,
+    -1.798,
+    -3.769,
+]
+
+
+def _period_cic(vals: list[int], period: int) -> float:
+    """Mean per-coset IoC (x26) at ``period`` -- high when the columns are peaked."""
+    if period < 1 or len(vals) < 2 * period:
+        return 0.0
+    total = 0.0
+    for c in range(period):
+        col = vals[c::period]
+        m = len(col)
+        if m < 2:
+            continue
+        counts = [0] * 26
+        for x in col:
+            counts[x] += 1
+        total += 26.0 * sum(k * (k - 1) for k in counts) / (m * (m - 1))
+    return total / period
+
+
+def _keyless_recover(
+    letters: str,
+    scorer: NgramScorer,
+    *,
+    bases: list[str],
+    max_period: int,
+    prefilter: int,
+    top: int,
+) -> list[tuple[float, str, str]]:
+    """Recover a Progressive Key with NO keyword hint (score, plaintext, key_repr).
+
+    Key idea: the *progression* is recoverable before the keyword. Undoing the
+    progression layer (a per-group shift) re-aligns every group to ONE keyword cipher, so
+    the correct (period, progression, base) SNAPS the de-drifted columns from flat back to
+    peaked -- detectable by per-coset IoC alone, cheaply, without touching the keyword. That
+    escapes the coupled keyword+progression search (the keyword need not be a dictionary
+    word). We rank all (period, base, progression) by de-drifted column IoC, then for the
+    best few recover each keyword letter by per-column English fit and score the read.
+    """
+    ct = [ord(c) - 65 for c in letters]
+    n = len(ct)
+    ranked: list[tuple[float, int, str, int]] = []
+    for base in bases:
+        _enc, dec, _kv = _BASES[base]
+        for period in range(2, max_period + 1):
+            for g in range(26):
+                resid = [dec((g * (i // period)) % 26, ct[i]) % 26 for i in range(n)]
+                ranked.append((_period_cic(resid, period), period, base, g))
+    ranked.sort(key=lambda r: r[0], reverse=True)
+
+    out: list[tuple[float, str, str]] = []
+    seen: set[str] = set()
+    for _cic, period, base, g in ranked[:prefilter]:
+        enc, dec, key_val = _BASES[base]
+        resid = [dec((g * (i // period)) % 26, ct[i]) % 26 for i in range(n)]
+        # recover each keyword letter by best English per-column fit
+        keyword_chars: list[str] = []
+        for col in range(period):
+            column = resid[col::period]
+            best_letter, best_fit = 0, -1e18
+            for letter in range(26):
+                shift = key_val(letter)
+                fit = sum(_ENG_LOGFREQ[dec(shift, y) % 26] for y in column)
+                if fit > best_fit:
+                    best_fit, best_letter = fit, letter
+            keyword_chars.append(chr(best_letter + 65))
+        keyword = "".join(keyword_chars)
+        key_repr = f"{keyword}/{g}/{base}"
+        if key_repr in seen:
+            continue
+        seen.add(key_repr)
+        # decode via the keyword-layer decrypt (progression already known)
+        shifts = [key_val(ord(ch) - 65) for ch in keyword]
+        plain = "".join(chr(dec(shifts[i % period], resid[i]) % 26 + 65) for i in range(n))
+        out.append((scorer.score(plain), plain, key_repr))
+    out.sort(key=lambda r: r[0], reverse=True)
+    return out[:top]
+
+
 class ProgressiveKey(Cipher):
     name = "progressive-key"
     aliases = ("progkey", "progressivekey")
@@ -190,20 +297,23 @@ class ProgressiveKey(Cipher):
         timeout: float | None = None,
         **opts,
     ) -> list[Candidate]:
-        """Best-effort brute force over keyword, progression and base cipher.
+        """Recover a Progressive Key, with or without a keyword hint.
 
-        The full keyless problem couples three unknowns: a keyword (effectively a
-        free-form word), a progression index (0-25 distinct values) and the base
-        cipher (4 choices). With no constraints the keyword space is unbounded, so
-        this crack is scoped to supplied candidate keywords:
+        The instance couples three unknowns: a keyword (a free-form word), a
+        progression index (0-25) and the base cipher (4 choices).
 
-        * ``opts["keyword"]`` -- a single candidate keyword, or
-        * ``opts["keywords"]`` -- an iterable of candidate keywords.
+        **With a keyword hint** (``opts["keyword"]`` or ``opts["keywords"]``) we
+        brute-force all 26 progressions and (unless ``opts["base"]`` is given) all
+        four bases for each supplied keyword, score every decryption and return
+        the best.
 
-        For each keyword we brute-force all 26 progressions and (unless
-        ``opts["base"]`` is given) all four base ciphers, score every decryption
-        and return the best. With no keyword hint we return ``[]`` rather than
-        pretend to solve an unbounded instance.
+        **Without a keyword hint** we recover it keyless via :func:`_keyless_recover`:
+        the progression is found *first* (undoing the per-group progression re-aligns
+        every group to one keyword cipher, snapping the columns from flat back to
+        peaked -- rankable by column IoC alone, no keyword needed), then each keyword
+        letter is recovered by a per-column English fit. Tuning: ``opts["max_period"]``
+        (group-size ceiling, default ``n//8`` capped at 15) and ``opts["prefilter"]``
+        (how many top (period, base, progression) triples to fully solve, default 24).
         """
         letters = only_letters(text)
         if len(letters) < 8:
@@ -214,8 +324,6 @@ class ProgressiveKey(Cipher):
             keywords.append(str(opts["keyword"]))
         keywords.extend(str(k) for k in opts.get("keywords", []))
         keywords = [k for k in keywords if only_letters(k)]
-        if not keywords:
-            return []
 
         forced_base = opts.get("base")
         if forced_base is not None:
@@ -225,6 +333,32 @@ class ProgressiveKey(Cipher):
             bases = [name]
         else:
             bases = ["vigenere", "beaufort", "variant", "porta"]
+
+        if not keywords:
+            # Keyless recovery: recover the progression first (de-drift un-flattens the
+            # columns -> detectable by column IoC), then each keyword letter by per-column
+            # English fit. No dictionary keyword hint required.
+            max_period = int(opts.get("max_period", min(len(letters) // 8, 15)))
+            prefilter = int(opts.get("prefilter", 24))
+            recovered = _keyless_recover(
+                letters,
+                scorer,
+                bases=bases,
+                max_period=max(2, max_period),
+                prefilter=prefilter,
+                top=top,
+            )
+            return [
+                Candidate(
+                    plaintext=reflow(text, plain),
+                    cipher=self.name,
+                    key=key_repr,
+                    score=score,
+                    confidence=scorer.confidence(plain),
+                    meta={"base": key_repr.rsplit("/", 1)[-1], "keyless": True},
+                )
+                for score, plain, key_repr in recovered
+            ]
 
         deadline = (time.monotonic() + timeout) if timeout else None
         results: list[tuple[float, str, str]] = []  # (score, plaintext, key_repr)

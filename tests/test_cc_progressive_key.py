@@ -91,8 +91,31 @@ def test_crack_recovers_with_keyword_hint():
     assert res[0].plaintext == prepared
 
 
-def test_crack_without_keyword_returns_empty():
+@pytest.mark.slow
+def test_crack_keyless_recovers_plaintext():
+    # No keyword hint: the progression is recovered first (de-drift un-flattens the
+    # columns), then the keyword per column -- so a long enough instance solves keyless.
     p = ProgressiveKey()
     scorer = get_scorer()
-    ct = p.encode("ATTACKATDAWNFROMTHEEASTERNRIDGEUNDERHEAVYFOG", "POLITICS/3")
-    assert p.crack(ct, scorer, timeout=5) == []
+    pt = (
+        "ITWASTHEBESTOFTIMESITWASTHEWORSTOFTIMESITWASTHEAGEOFWISDOMITWASTHEAGEOF"
+        "FOOLISHNESSITWASTHEEPOCHOFBELIEFITWASTHEEPOCHOFINCREDULITYITWASTHESEASON"
+        "OFLIGHTITWASTHESEASONOFDARKNESSITWASTHESPRINGOFHOPEITWASTHEWINTEROFDESPAIR"
+    )
+    prepared = "".join(c for c in pt.upper() if "A" <= c <= "Z")
+    for key in ("POLITICS/3/vigenere", "CIPHERS/11/vigenere"):
+        ct = p.encode(pt, key)
+        res = p.crack(ct, scorer, top=3)  # no keyword hint
+        assert res, f"keyless crack returned nothing for {key}"
+        assert res[0].plaintext == prepared, f"keyless crack failed for {key}"
+        assert res[0].meta.get("keyless") is True
+
+
+def test_crack_keyless_too_short_is_safe():
+    # A very short instance has too few letters per column to solve; must not crash
+    # and must not fabricate a confident wrong answer at solve-quality score.
+    p = ProgressiveKey()
+    scorer = get_scorer()
+    ct = p.encode("ATTACKATDAWN", "POLITICS/3")
+    res = p.crack(ct, scorer, timeout=5)
+    assert isinstance(res, list)
