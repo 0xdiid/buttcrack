@@ -30,8 +30,10 @@ PLAIN = only_letters(
     "THEARCHIVESHEWILLREBIND"
 )[:280]
 # A random 40-letter Vigenere key over the KRYPTOS keyed alphabet (period 40,
-# ~7 letters/column) for which the deterministic cold 1-opt pass traps.
-INDICATOR = "INSPQQZASHYEBWQVDWTNPEPHDUWOVPWRIRMVJRZU"
+# ~7 letters/column) for which the deterministic cold 1-opt pass traps. Tuned for
+# the canonical Quagmire-III alignment (keyed alphabet's first letter, KEY has no
+# explicit third field), so it must be re-tuned if that default ever changes.
+INDICATOR = "JRTKFXMLENPKESJPELGOFVBBILICLZWPWFNRDXTB"
 KEY = f"KRYPTOS/{INDICATOR}"
 PERIOD = 40
 
