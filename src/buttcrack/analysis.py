@@ -2380,3 +2380,121 @@ def heldout_stationarity(
         "z": round(z, 2),
         "nonstationary": z <= -3.0,
     }
+
+
+def schedule_conditioned_fit(
+    letters: str,
+    schedule: Sequence[int],
+    *,
+    period: int = 7,
+    alphabet: str = "STANDARD",
+    max_offset: int | None = None,
+    restarts: int = 4,
+    seed: int = 20250720,
+    null_samples: int = 0,
+) -> dict[str, object]:
+    """Test whether ``letters`` is a period-``period`` ADDITIVE key over a payload, MIXED by a
+    known per-position class ``schedule`` (a k-value additive selector) -- fitting the
+    period-``period`` key FREELY.
+
+    An additive shift is a bijection within each residue class, so the period-``period`` key
+    is un-recoverable from ``letters`` alone: every within-class statistic is invariant, and no
+    measurement distinguishes the right key from a wrong one. CONDITIONING on ``schedule``
+    defeats that -- within each cell ``(i % period, schedule[i])`` the total shift is constant,
+    so each cell is a pure Caesar of the payload. If ``schedule`` is the true mixing schedule,
+    de-keying snaps the IoC toward the language's; a wrong or shuffled schedule does not. This is
+    the strip-free way to test a hypothesized mixing schedule (e.g. one derived from a *related*
+    message) without ever recovering the period key -- the analogue of a chained running-key
+    "snap" for the mixture case.
+
+    Model ``shift(i) = a[i % period] + d[schedule[i]]`` (mod 26), the most-common schedule class
+    anchored to ``d = 0``. ``max_offset`` bounds |d| (e.g. ``4`` for a "slight variation"
+    mixture); ``None`` leaves the per-class offsets free. Fit is monogram-log-likelihood
+    coordinate ascent with ``restarts`` random starts; ``alphabet`` is the ring the additive is
+    measured in. With ``null_samples`` > 0 the de-keyed IoC is z-scored against the identical fit
+    on that many SHUFFLED schedules (the overfit-controlled null).
+
+    Returns ``{"plaintext", "shifts", "offsets", "loglik", "ioc", "z", "snaps"}``. ``z``/``snaps``
+    are ``None`` when ``null_samples`` == 0. The robust signal is ``z`` (the de-keyed IoC's
+    lead over shuffled schedules) rather than an absolute IoC, because a free fit on a short
+    text recovers only approximately even for the true schedule; ``snaps`` is True iff
+    ``z >= 4`` AND the de-keyed IoC clears 0.05 (materially above the ~0.0385 random floor).
+    """
+    ring = _alphabet(alphabet)
+    ai = {c: i for i, c in enumerate(ring)}
+    idx = [ai[c] for c in only_letters(letters)]
+    n = len(idx)
+    sched = [int(s) for s in schedule]
+    if len(sched) != n:
+        raise ValueError("schedule length must equal the number of letters")
+    if period < 1 or n < 2 * period:
+        raise ValueError("need period >= 1 and at least 2*period letters")
+    logp = [math.log(max(ENGLISH_MONOGRAM_FREQ[ring[j]], 1e-6)) for j in range(26)]
+    ks = sorted(set(sched))
+    anchor = max(ks, key=sched.count)
+    offs = (
+        list(range(26))
+        if max_offset is None
+        else [d % 26 for d in range(-max_offset, max_offset + 1)]
+    )
+    rng = random.Random(seed)
+
+    def _caesar(vals: list[int], allowed) -> int:
+        best_s, best_ll = 0, -1e18
+        for s in allowed:
+            ll = 0.0
+            for v in vals:
+                ll += logp[(v - s) % 26]
+            if ll > best_ll:
+                best_ll, best_s = ll, s
+        return best_s
+
+    def _fit(sch: list[int]) -> tuple[float, list[int], dict[int, int], list[int]]:
+        best: tuple[float, list[int], dict[int, int], list[int]] | None = None
+        for _ in range(max(1, restarts)):
+            d = {k: (0 if (k == anchor or max_offset is None) else rng.choice(offs)) for k in ks}
+            a = [0] * period
+            for _sweep in range(7):
+                adj = [(idx[i] - d[sch[i]]) % 26 for i in range(n)]
+                for c in range(period):
+                    a[c] = _caesar([adj[i] for i in range(c, n, period)], range(26))
+                res = [(idx[i] - a[i % period]) % 26 for i in range(n)]
+                nd = {}
+                for k in ks:
+                    vals = [res[i] for i in range(n) if sch[i] == k]
+                    nd[k] = _caesar(vals, offs) if vals else 0
+                base = nd[anchor]
+                d = {k: (v - base) % 26 for k, v in nd.items()}
+                a = [(x + base) % 26 for x in a]
+            pt = [(idx[i] - a[i % period] - d[sch[i]]) % 26 for i in range(n)]
+            ll = sum(logp[p] for p in pt)
+            if best is None or ll > best[0]:
+                best = (ll, a[:], dict(d), pt)
+        assert best is not None
+        return best
+
+    ll, a, d, pt = _fit(sched)
+    plaintext = "".join(ring[p] for p in pt)
+    ic = index_of_coincidence(plaintext)
+    z: float | None = None
+    snaps: bool | None = None
+    if null_samples > 0:
+        nulls = []
+        for _ in range(null_samples):
+            sh = sched[:]
+            rng.shuffle(sh)
+            _, _, _, ptn = _fit(sh)
+            nulls.append(index_of_coincidence("".join(ring[p] for p in ptn)))
+        mu = sum(nulls) / len(nulls)
+        sd = (sum((x - mu) ** 2 for x in nulls) / len(nulls)) ** 0.5 or 1e-9
+        z = round((ic - mu) / sd, 2)
+        snaps = bool(z >= 4.0 and ic >= 0.05)
+    return {
+        "plaintext": plaintext,
+        "shifts": a,
+        "offsets": d,
+        "loglik": round(ll, 2),
+        "ioc": round(ic, 4),
+        "z": z,
+        "snaps": snaps,
+    }

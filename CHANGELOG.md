@@ -19,6 +19,17 @@ solvers). The general, PK-agnostic core of each is now a first-class, tested mod
   (keyword by per-column English fit) and scored, escaping the coupled keyword+progression search
   that previously made the cipher un-crackable blind. `crack` with no keyword hint now returns
   keyless candidates (`meta.keyless=True`) instead of `[]`; `max_period`/`prefilter` tune it.
+- **`buttcrack.analysis.schedule_conditioned_fit`** — test a hypothesized *mixing schedule* without
+  recovering the period key. Given a per-position class ``schedule`` (a k-value additive selector, e.g.
+  one derived from a *related* message), it fits ``shift(i) = a[i%period] + d[schedule[i]]`` FREELY (the
+  period-``period`` additive plus per-class offsets) by monogram coordinate ascent, then z-scores the
+  de-keyed IoC against the same fit on SHUFFLED schedules. The point: an additive shift is a bijection
+  within each residue class, so the key is *un-recoverable* from the ciphertext alone (every within-class
+  statistic is invariant) — but conditioning on the schedule makes each ``(i%period, class)`` cell a pure
+  Caesar, so the de-keyed IoC snaps toward the language's iff the schedule is real. The strip-free analogue
+  of a chained running-key "snap", for the additive-mixture case; ``max_offset`` bounds the offsets to a
+  "slight variation" range. Fitting the key freely (rather than pinning it to a noisy alignment estimate
+  before testing the schedule) is what makes a genuine schedule detectable.
 - **`buttcrack.analysis.heldout_stationarity`** — a held-out transfer test for whether a period-``p``
   additive key is *stationary* across the text: fit the per-coset shifts on the first half, then
   measure how well they pool the held-out remainder. It is z-scored against a **within-coset-shuffle**
