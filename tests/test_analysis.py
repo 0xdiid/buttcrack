@@ -567,3 +567,33 @@ def test_heldout_stationarity_no_false_positive_on_flattener():
     nonstat = vig(pt[:half], "AAAAAAA") + vig(pt[half:], "NQXMKZU")
     r_ns = heldout_stationarity(nonstat, period=7, samples=150)
     assert r_ns["z"] < r_trap["z"]
+
+
+def test_schedule_conditioned_fit_detects_true_mixing_schedule():
+    """A period-7 additive over English, MIXED by a known 4-value schedule, is detected
+    only by the TRUE schedule: fitting the key freely, the de-keyed IoC leads shuffled
+    schedules by a large z (strip-free -- the key itself is un-recoverable)."""
+    import random
+
+    from buttcrack.analysis import schedule_conditioned_fit
+
+    rng = random.Random(3)
+    prose = (
+        "INTHEQUIETOFTHELIBRARYTHESCHOLARTURNSTHEBRITTLEPAGESOFANANCIENTATLAS"
+        "TRACINGFADEDCOASTLINESWITHAGLOVEDFINGEREVERYMAPTELLSOFHARBORSLONGSILTED"
+    ) * 2
+    pt = "".join(c for c in prose if "A" <= c <= "Z")[:210]
+    sched = [rng.randrange(4) for _ in range(len(pt))]
+    a = [rng.randrange(26) for _ in range(7)]
+    d = {0: 0, 1: 3, 2: 24, 3: 1}  # per-class offsets (24 == -2 mod 26)
+    ct = "".join(chr((ord(pt[i]) - 65 + a[i % 7] + d[sched[i]]) % 26 + 65) for i in range(len(pt)))
+
+    true = schedule_conditioned_fit(ct, sched, period=7, max_offset=4, null_samples=40)
+    assert true["snaps"] is True
+    assert true["z"] >= 4.0
+
+    wrong = sched[:]
+    rng.shuffle(wrong)
+    shuf = schedule_conditioned_fit(ct, wrong, period=7, max_offset=4, null_samples=40)
+    assert shuf["snaps"] is False
+    assert shuf["z"] < true["z"]
