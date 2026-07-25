@@ -599,6 +599,7 @@ length; quadgrams see across the scaling). The genuine matrix wins by a wide mar
 
 ```python
 from buttcrack.ciphers._hill_recover import recover
+
 recs = recover(ct, scorer, alphabet="KRYPTOS", q_values=(1, 2), pair_brute=True)
 # recs[0].decrypt_matrix / .offsets / .plaintext ; or just `butt crack --cipher hill`
 ```
@@ -622,8 +623,9 @@ that decodes the rest as English.
 
 ```python
 from buttcrack.hill_kpa import solve_mod26, recover_matrix, recover_affine
-recover_matrix(known_pt, ct, n=3, alphabet="STD", offset=0)   # crib may start mid-message
-recover_affine(known_pt, ct, n=3, q=2, alphabet="KRYPTOS")     # matrix + period-q additive
+
+recover_matrix(known_pt, ct, n=3, alphabet="STD", offset=0)  # crib may start mid-message
+recover_affine(known_pt, ct, n=3, q=2, alphabet="KRYPTOS")  # matrix + period-q additive
 ```
 
 ## 17. The coset-preserving transposition: an honest, provable blind wall
