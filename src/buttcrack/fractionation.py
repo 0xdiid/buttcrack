@@ -43,6 +43,7 @@ from __future__ import annotations
 
 import random
 import time
+from functools import partial
 
 from .scoring import index_of_coincidence, resolve_scorer
 
@@ -133,7 +134,54 @@ def _bifid6_di(alpha: str):
     return fwd, inv
 
 
-def bifid6_encode(pt: str, alpha: str, period: int) -> str:
+#: Bifid seriation read-order variants: ``(half_order, reverse_rows, reverse_cols)``.
+#: A Bifid gathers each block's row- and column-coordinates into one sequence, then
+#: re-pairs it. Implementations differ in *how* they gather — rows-then-columns
+#: (``"RC"``) vs columns-then-rows (``"CR"``), each optionally reversing the row and/or
+#: column run. Several of these are statistically indistinguishable from one another,
+#: so a blind solver that assumes only the standard order silently misses ciphertext
+#: built with a different one. ``"std"`` is the classic row-major bifid (backward
+#: compatible default).
+GATHER_VARIANTS: dict[str, tuple[str, bool, bool]] = {
+    "std": ("RC", False, False),
+    "rc_ft": ("RC", False, True),
+    "rc_tf": ("RC", True, False),
+    "rc_tt": ("RC", True, True),
+    "cr_ff": ("CR", False, False),
+    "cr_ft": ("CR", False, True),
+    "cr_tf": ("CR", True, False),
+    "cr_tt": ("CR", True, True),
+}
+
+
+def _resolve_gather(gather: str | tuple[str, bool, bool]) -> tuple[str, bool, bool]:
+    return GATHER_VARIANTS[gather] if isinstance(gather, str) else tuple(gather)  # type: ignore[return-value]
+
+
+def _gather(rows: list[int], cols: list[int], spec: tuple[str, bool, bool]) -> list[int]:
+    half, rev_r, rev_c = spec
+    r = rows[::-1] if rev_r else list(rows)
+    c = cols[::-1] if rev_c else list(cols)
+    return (r + c) if half == "RC" else (c + r)
+
+
+def _ungather(seq: list[int], p: int, spec: tuple[str, bool, bool]) -> tuple[list[int], list[int]]:
+    half, rev_r, rev_c = spec
+    if half == "RC":
+        r, c = seq[:p], seq[p:]
+    else:
+        c, r = seq[:p], seq[p:]
+    if rev_r:
+        r = r[::-1]
+    if rev_c:
+        c = c[::-1]
+    return r, c
+
+
+def bifid6_encode(
+    pt: str, alpha: str, period: int, gather: str | tuple[str, bool, bool] = "std"
+) -> str:
+    spec = _resolve_gather(gather)
     fwd, inv = _bifid6_di(alpha)
     out: list[str] = []
     for i in range(0, len(pt), period):
@@ -141,22 +189,29 @@ def bifid6_encode(pt: str, alpha: str, period: int) -> str:
         p = len(block)
         rows = [fwd[c][0] for c in block]
         cols = [fwd[c][1] for c in block]
-        digits = "".join(str(x) for x in (rows + cols))
+        seq = _gather(rows, cols, spec)
         for j in range(0, 2 * p, 2):
-            out.append(inv[(int(digits[j]), int(digits[j + 1]))])
+            out.append(inv[(seq[j], seq[j + 1])])
     return "".join(out)
 
 
-def bifid6_decode(ct: str, alpha: str, period: int) -> str:
+def bifid6_decode(
+    ct: str, alpha: str, period: int, gather: str | tuple[str, bool, bool] = "std"
+) -> str:
+    spec = _resolve_gather(gather)
     fwd, inv = _bifid6_di(alpha)
     out: list[str] = []
     for i in range(0, len(ct), period):
         block = ct[i : i + period]
         p = len(block)
-        digits = "".join(f"{fwd[c][0]}{fwd[c][1]}" for c in block)
-        rows, cols = digits[0:p], digits[p : 2 * p]
+        seq: list[int] = []
+        for c in block:
+            r, cc = fwd[c]
+            seq.append(r)
+            seq.append(cc)
+        rows, cols = _ungather(seq, p, spec)
         for j in range(p):
-            out.append(inv[(int(rows[j]), int(cols[j]))])
+            out.append(inv[(rows[j], cols[j])])
     return "".join(out)
 
 
@@ -412,17 +467,24 @@ def solve_bifid6(
     seconds_per_start: float = 4.0,
     probe_seconds: float = 2.0,
     seed: int = 0,
+    gather: str | tuple[str, bool, bool] = "std",
 ) -> dict:
     """Blind 6x6 Bifid/Polybius crack: detect period, greedy square climb.
 
     Returns ``dict(score, plaintext, key, period, ioc, period_ranking)`` where
     ``key`` is the recovered 36-cell alphabet (26 letters + 10 digits).
+
+    ``gather`` selects the seriation read-order (see :data:`GATHER_VARIANTS`); the
+    variants are statistically near-indistinguishable, so sweep them all — e.g.
+    ``best = max((solve_bifid6(ct, gather=g) for g in GATHER_VARIANTS), key=lambda r: r["score"])``
+    — when the standard order does not read out.
     """
+    decode = partial(bifid6_decode, gather=gather)
     return _blind_solve(
         ct,
         STANDARD + DIGITS,
         "",
-        bifid6_decode,
+        decode,
         periods=periods,
         restarts=restarts,
         seconds_per_start=seconds_per_start,
