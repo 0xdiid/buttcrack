@@ -28,6 +28,10 @@ dependencies = []
 # Python when it is absent), but the test suite uses it as a cross-check oracle
 # and analysis.py's vectorized path assumes it in dev/test — so it ships here.
 dev = ["pytest>=7", "pytest-xdist>=3", "ruff>=0.6", "mypy>=1.8", "numpy>=1.24"]
+# Constraint-propagation crib recovery (buttcrack.crib_csp). Optional: the module
+# imports OR-Tools lazily and raises a pointed ImportError if it is absent, so the
+# package keeps its zero-runtime-dependency promise.
+csp = ["ortools>=9.10"]
 
 [project.scripts]
 butt = "buttcrack.cli:main"
