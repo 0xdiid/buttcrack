@@ -261,6 +261,83 @@ def route_corpus(sentences: int = 400, *, seed: int = 0) -> str:
     return "".join(out)
 
 
+_MONTHS = (
+    "JANUARY FEBRUARY MARCH APRIL MAY JUNE JULY AUGUST "
+    "SEPTEMBER OCTOBER NOVEMBER DECEMBER"
+).split()
+_WEEKDAYS = "MONDAY TUESDAY WEDNESDAY THURSDAY FRIDAY SATURDAY SUNDAY".split()
+_TELEGRAPH_VERBS = (
+    "ARRIVE DEPART CONFIRM ADVISE SEND AWAIT PROCEED RETURN MEET DELAY CANCEL REQUEST"
+).split()
+_TELEGRAPH_NOUNS = (
+    "PACKAGE FUNDS ORDERS PARTY SHIPMENT CONTACT LETTER TRAIN VESSEL CARGO SIGNAL PAPERS"
+).split()
+
+#: Registers :func:`register_corpus` can synthesize. Use them to build
+#: register-diverse plant gates and register-matched n-gram tables.
+REGISTERS = ("route", "wordlist", "dates", "telegraphic", "numeric")
+
+
+def register_corpus(register: str, *, sentences: int = 400, seed: int = 0) -> str:
+    """Deterministic synthetic corpus for a non-prose plaintext REGISTER.
+
+    A plant gate's recall is register-specific: a solver tuned on prose recovers
+    prose plants and silently loses wordlist/coded/telegraphic payloads, so a null
+    proven on prose plants does not transfer (see
+    :class:`buttcrack.evidence.PlantGate`). These corpora exist to (a) plant
+    same-register synthetics and (b) train register-matched
+    :class:`GenreModel`/n-gram tables that must beat the English model on their
+    own register BEFORE any search time is spent behind them.
+
+    Registers: ``route`` (directions/distances — :func:`route_corpus`),
+    ``wordlist`` (concatenated dictionary words, no grammar), ``dates`` (spelled
+    dates, ordinals, years), ``telegraphic`` (terse cable style: verbs, nouns,
+    spelled figures, STOP), ``numeric`` (spelled numbers only). Unspaced A-Z,
+    fully determined by ``seed``.
+    """
+    if register == "route":
+        return route_corpus(sentences, seed=seed)
+    rng = random.Random(seed)
+    out: list[str] = []
+    if register == "wordlist":
+        from .words import _words
+
+        pool = [w for w in _words() if len(w) >= 4]
+        for _ in range(sentences):
+            out += [rng.choice(pool) for _ in range(3)]
+    elif register == "dates":
+        for _ in range(sentences):
+            out += [
+                rng.choice(_WEEKDAYS),
+                rng.choice(_ORDINALS),
+                rng.choice(_MONTHS),
+                _numword(rng.randint(1, 99)),
+            ]
+    elif register == "telegraphic":
+        for _ in range(sentences):
+            r = rng.random()
+            if r < 0.5:
+                out += [
+                    rng.choice(_TELEGRAPH_VERBS),
+                    rng.choice(_TELEGRAPH_NOUNS),
+                    rng.choice(_WEEKDAYS),
+                    "STOP",
+                ]
+            else:
+                out += [
+                    rng.choice(_TELEGRAPH_NOUNS),
+                    rng.choice(_TELEGRAPH_VERBS),
+                    _numword(rng.randint(1, 99)),
+                    "STOP",
+                ]
+    elif register == "numeric":
+        for _ in range(sentences):
+            out.append(_numword(rng.randint(1, 99)))
+    else:
+        raise ValueError(f"unknown register {register!r}; expected one of {REGISTERS}")
+    return "".join(out)
+
+
 #: A public-domain-style English prose sample (original text, not puzzle material)
 #: used to train the default prose model. Deliberately varied ordinary vocabulary so
 #: the trigram statistics reflect natural narrative English rather than any one topic.
