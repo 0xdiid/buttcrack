@@ -80,7 +80,10 @@ class GateBand:
         state = "gated" if self.gated else "UNGATED (says nothing about any target)"
         gm = sum(self.gate_scores) / len(self.gate_scores) if self.gate_scores else float("nan")
         cm = sum(self.ctrl_scores) / len(self.ctrl_scores) if self.ctrl_scores else float("nan")
-        return f"{self.cipher} @ n={self.n}: gate {gm:.3f} vs ctrl {cm:.3f} (z={self.gate_z:+.1f}) — {state}"
+        return (
+            f"{self.cipher} @ n={self.n}: gate {gm:.3f} vs ctrl {cm:.3f}"
+            f" (z={self.gate_z:+.1f}) — {state}"
+        )
 
 
 def solver_band(
@@ -108,7 +111,8 @@ def solver_band(
     for t in range(trials):
         pt = _plant_text(n, offset=17 * t)
         try:
-            ct = cipher.encode(pt, cipher.key_example) if cipher.needs_key else cipher.encode(pt, "")
+            key = cipher.key_example if cipher.needs_key else ""
+            ct = cipher.encode(pt, key)
         except Exception:
             ct = None
         if ct:
@@ -174,9 +178,7 @@ def detector_sweep(
     for name in ciphers or registry.names():
         band = solver_band(name, n, trials=trials, scorer=scorer, timeout=timeout, rng=rng)
         cipher = registry.get(name)
-        if cipher.ciphertext_alphabet and any(
-            c not in cipher.ciphertext_alphabet for c in letters
-        ):
+        if cipher.ciphertext_alphabet and any(c not in cipher.ciphertext_alphabet for c in letters):
             rows.append(DetectorRow(cipher.name, band, None, None, "noise"))
             continue
         if not band.gated:

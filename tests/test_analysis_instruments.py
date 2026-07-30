@@ -26,12 +26,11 @@ def _rand_text(n: int, rng: random.Random) -> str:
 
 
 def _vigenere(pt: str, key: list[int]) -> str:
-    return "".join(
-        chr((ord(c) - 65 + key[i % len(key)]) % 26 + 65) for i, c in enumerate(pt)
-    )
+    return "".join(chr((ord(c) - 65 + key[i % len(key)]) % 26 + 65) for i, c in enumerate(pt))
 
 
 # ------------------------------------------------------ harmonic corroboration
+
 
 def test_harmonic_corroborates_a_true_period_7():
     rng = random.Random(1)
@@ -63,6 +62,7 @@ def test_harmonic_validates_range():
 
 
 # ------------------------------------------------------ lag-difference scan
+
 
 def test_lag_difference_finds_a_cycled_key():
     rng = random.Random(4)
@@ -105,12 +105,12 @@ def test_lag_difference_quiet_on_random_text():
 
 # ------------------------------------------------------ separable-pad annihilator
 
+
 def _separable_ct(n: int, p: int, q: int, rng: random.Random) -> str:
     a = [rng.randrange(26) for _ in range(p)]
     b = [rng.randrange(26) for _ in range(q)]
     return "".join(
-        chr((ord(c) - 65 + a[i % p] + b[i % q]) % 26 + 65)
-        for i, c in enumerate(ENGLISH[:n])
+        chr((ord(c) - 65 + a[i % p] + b[i % q]) % 26 + 65) for i, c in enumerate(ENGLISH[:n])
     )
 
 

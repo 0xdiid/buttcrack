@@ -210,7 +210,9 @@ class NullResult:
             f"rank={self.rank}/{self.trials + 1}"
         )
         if self.degenerate:
-            base += " [DEGENERATE null: statistic invariant under it — pick a more destructive null]"
+            base += (
+                " [DEGENERATE null: statistic invariant under it — pick a more destructive null]"
+            )
         return base
 
 

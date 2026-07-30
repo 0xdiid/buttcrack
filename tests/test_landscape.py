@@ -51,6 +51,7 @@ def damage_fn(key, k, rng):
 
 # ------------------------------------------------------------- probe A
 
+
 def test_truth_is_local_max_on_smooth_and_needle():
     assert landscape.local_max_probe(TRUTH, neighbors, smooth).is_local_max
     assert landscape.local_max_probe(TRUTH, neighbors, needle).is_local_max
@@ -66,6 +67,7 @@ def test_probe_a_fails_when_objective_prefers_a_neighbor():
 
 
 # ------------------------------------------------------------- probe B
+
 
 def test_identifiable_on_smooth_landscape():
     rng = random.Random(1)
@@ -95,6 +97,7 @@ def test_dead_lane_when_truth_not_local_max():
 
 # ------------------------------------------------------------- probe C
 
+
 def test_crib_floor_on_needle_is_full_lock():
     """A needle objective recovers only when everything except noise is locked."""
 
@@ -121,6 +124,7 @@ def test_crib_floor_on_smooth_is_zero():
 
 
 # ------------------------------------------------------------- damage ladder
+
 
 def test_damage_ladder_smooth_is_not_a_cliff():
     res = landscape.damage_ladder(

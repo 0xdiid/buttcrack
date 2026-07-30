@@ -234,12 +234,10 @@ def solve_bifid_crib(
             if self.n >= max_solutions:
                 self.StopSearch()
 
-    status = solver.SearchForAllSolutions(m, _Collect()) if max_solutions > 1 \
-        else solver.Solve(m)
+    status = solver.SearchForAllSolutions(m, _Collect()) if max_solutions > 1 else solver.Solve(m)
     if max_solutions == 1 and status in (cp_model.OPTIMAL, cp_model.FEASIBLE):
         sq = [""] * 25
         for i, c in enumerate(G):
             sq[solver.Value(cell[i])] = c
-        sols.append(CribSolution(
-            "".join(sq), tuple(solver.Value(s) for s in strip), ""))
+        sols.append(CribSolution("".join(sq), tuple(solver.Value(s) for s in strip), ""))
     return sols, solver.StatusName(status)

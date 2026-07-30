@@ -442,9 +442,7 @@ def control_battery(
 
     if plant is not None:
         spec = dict(plant)
-        structure_spec = spec.pop("structure_spec", None) or {
-            "structure": spec.pop("structure")
-        }
+        structure_spec = spec.pop("structure_spec", None) or {"structure": spec.pop("structure")}
         pc = positive_control(
             attack_fn,
             structure_spec,

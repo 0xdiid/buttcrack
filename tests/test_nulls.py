@@ -148,6 +148,7 @@ def test_add_one_smoothing_never_zero():
 
 # ------------------------------------------------------- degenerate-null guard
 
+
 def _coset_multiset_stat(text):
     """A statistic that depends only on the mod-3 coset multisets (not their order)."""
     counts = []
@@ -160,19 +161,22 @@ def _coset_multiset_stat(text):
 def test_coset_preserving_null_is_degenerate_for_multiset_statistic():
     text = "THEQUICKBROWNFOXJUMPSOVERTHELAZYDOG"
     assert nulls.null_is_degenerate(
-        text, _coset_multiset_stat, nulls.within_coset(3), rng=random.Random(1))
+        text, _coset_multiset_stat, nulls.within_coset(3), rng=random.Random(1)
+    )
 
 
 def test_full_permutation_is_not_degenerate_for_multiset_statistic():
     text = "THEQUICKBROWNFOXJUMPSOVERTHELAZYDOG"
     assert not nulls.null_is_degenerate(
-        text, _coset_multiset_stat, nulls.permutation, rng=random.Random(1))
+        text, _coset_multiset_stat, nulls.permutation, rng=random.Random(1)
+    )
 
 
 def test_null_test_flags_degenerate_pairing():
     text = "THEQUICKBROWNFOXJUMPSOVERTHELAZYDOG"
-    res = nulls.null_test(text, _coset_multiset_stat, nulls.within_coset(3),
-                          trials=30, rng=random.Random(1))
+    res = nulls.null_test(
+        text, _coset_multiset_stat, nulls.within_coset(3), trials=30, rng=random.Random(1)
+    )
     assert res.degenerate
     assert "DEGENERATE" in res.summary()
 
@@ -183,6 +187,7 @@ def test_null_test_not_degenerate_for_order_sensitive_statistic():
     def first_letter_ord(t):
         return float(ord(t[0]))
 
-    res = nulls.null_test(text, first_letter_ord, nulls.permutation,
-                          trials=30, rng=random.Random(1))
+    res = nulls.null_test(
+        text, first_letter_ord, nulls.permutation, trials=30, rng=random.Random(1)
+    )
     assert not res.degenerate

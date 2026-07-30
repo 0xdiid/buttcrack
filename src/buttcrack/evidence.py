@@ -72,7 +72,7 @@ def searched_fraction(axes: Mapping[str, int], completed: int) -> dict[str, Any]
     axes fixed (an orientation here, a gauge there); multiplying the *declared* axes
     out overturned one such verdict by 2.5 orders of magnitude. This makes that
     bookkeeping one call: ``axes`` maps each free axis to its cardinality (e.g.
-    ``{"orientation": 2, "period": 5, "square": 38_300_000}``), ``completed`` is how
+    ``{"orientation": 2, "period": 5, "square": 40_000_000}``), ``completed`` is how
     many cells were actually evaluated. Returns ``{declared, completed, fraction,
     axes, summary}``. Feed ``declared`` to :meth:`Finding.with_coverage` as
     ``intended`` so the coverage claim and the axis arithmetic cannot drift apart.
@@ -131,8 +131,10 @@ class PlantGate:
         return self.recall >= MIN_PLANT_RECALL
 
     def summary(self) -> str:
-        return (f"plant {self.recovered}/{self.trials} recall={self.recall:.2f} "
-                f"[{self.construction}; register={self.register}]")
+        return (
+            f"plant {self.recovered}/{self.trials} recall={self.recall:.2f} "
+            f"[{self.construction}; register={self.register}]"
+        )
 
 
 @dataclass(frozen=True)
@@ -169,15 +171,21 @@ class Coverage:
         extra = ""
         if self.timeouts or self.capped:
             extra = f", {self.timeouts} timed out, {self.capped} hit caps (NOT negatives)"
-        return (f"covered {self.evaluated:,}/{self.intended:,} "
-                f"({100 * self.fraction:.1f}%){extra}")
+        return f"covered {self.evaluated:,}/{self.intended:,} ({100 * self.fraction:.1f}%){extra}"
 
     @classmethod
-    def of_axes(cls, evaluated: int, *, timeouts: int = 0, capped: int = 0,
-                exhaustive: bool = False, **axes: int) -> Coverage:
+    def of_axes(
+        cls,
+        evaluated: int,
+        *,
+        timeouts: int = 0,
+        capped: int = 0,
+        exhaustive: bool = False,
+        **axes: int,
+    ) -> Coverage:
         """Coverage whose ``intended`` is the product of the declared free axes.
 
-        ``Coverage.of_axes(500_000, orientation=2, square=38_300_000)`` cannot
+        ``Coverage.of_axes(500_000, orientation=2, square=40_000_000)`` cannot
         understate the space the way a hand-typed ``intended`` can — see
         :func:`searched_fraction`.
         """
@@ -212,8 +220,7 @@ class Finding:
 
     # ------------------------------------------------------------------ builders
 
-    def with_plant(self, recovered: int, trials: int, construction: str,
-                   register: str) -> Finding:
+    def with_plant(self, recovered: int, trials: int, construction: str, register: str) -> Finding:
         self.plant = PlantGate(recovered, trials, construction, register)
         return self
 
@@ -226,8 +233,15 @@ class Finding:
             self.p_value = p_value
         return self
 
-    def with_coverage(self, evaluated: int, intended: int, *, timeouts: int = 0,
-                      capped: int = 0, exhaustive: bool = False) -> Finding:
+    def with_coverage(
+        self,
+        evaluated: int,
+        intended: int,
+        *,
+        timeouts: int = 0,
+        capped: int = 0,
+        exhaustive: bool = False,
+    ) -> Finding:
         self.coverage = Coverage(evaluated, intended, timeouts, capped, exhaustive)
         return self
 
@@ -294,11 +308,13 @@ class Finding:
         if self.plant is None:
             gaps.append(
                 "no plant gate: the instrument was never shown to recover a synthetic "
-                "of this construction, so its silence carries no information")
+                "of this construction, so its silence carries no information"
+            )
         elif not self.plant.passed:
             gaps.append(
                 f"plant gate FAILED ({self.plant.summary()}): recall below "
-                f"{MIN_PLANT_RECALL:.0%} means a null is uninformative, not negative")
+                f"{MIN_PLANT_RECALL:.0%} means a null is uninformative, not negative"
+            )
         if self.null_description is None:
             gaps.append("no matched null: state what it preserves and what it destroys")
         if self.coverage is None:
@@ -321,8 +337,7 @@ class Finding:
             return "void"
         gaps = self.missing()
         if gaps:
-            raise Unverified(
-                f"cannot state {self.claim!r}:\n  - " + "\n  - ".join(gaps))
+            raise Unverified(f"cannot state {self.claim!r}:\n  - " + "\n  - ".join(gaps))
         assert self.coverage is not None
         cp = self.corrected_p
         if cp is not None and cp < 0.05:
@@ -336,7 +351,7 @@ class Finding:
         return "null (partial)"
 
     def render(self) -> str:
-        v = self.verdict()          # raises Unverified if unearned
+        v = self.verdict()  # raises Unverified if unearned
         lines = [f"{self.claim}", f"  verdict     : {v}"]
         if v == "void":
             lines.append(f"  void        : {self.void_reason}")
@@ -346,13 +361,20 @@ class Finding:
         if self.observed is not None:
             lines.append(f"  observed    : {self.observed:.4f}")
         if self.p_value is not None:
-            lines.append(f"  p           : {self.p_value:.4g} raw, "
-                         f"{self.corrected_p:.4g} corrected over "
-                         f"{self.family_size} hypotheses")
+            lines.append(
+                f"  p           : {self.p_value:.4g} raw, "
+                f"{self.corrected_p:.4g} corrected over "
+                f"{self.family_size} hypotheses"
+            )
         if self.power_z is not None:
-            lines.append(f"  power       : z={self.power_z:+.2f} on same-shape plants"
-                         + ("" if self.power_z >= MIN_POWER_Z
-                            else f" (below {MIN_POWER_Z:.0f} — null is SILENT)"))
+            lines.append(
+                f"  power       : z={self.power_z:+.2f} on same-shape plants"
+                + (
+                    ""
+                    if self.power_z >= MIN_POWER_Z
+                    else f" (below {MIN_POWER_Z:.0f} — null is SILENT)"
+                )
+            )
         lines.append(f"  {self.plant.summary()}")
         lines.append(f"  null        : {self.null_description}")
         lines.append(f"  {self.coverage.summary()}")
@@ -380,14 +402,18 @@ class Finding:
             "corrected_p": self.corrected_p,
             "family_size": self.family_size,
             "plant": {
-                "recovered": self.plant.recovered, "trials": self.plant.trials,
-                "recall": self.plant.recall, "construction": self.plant.construction,
+                "recovered": self.plant.recovered,
+                "trials": self.plant.trials,
+                "recall": self.plant.recall,
+                "construction": self.plant.construction,
                 "register": self.plant.register,
             },
             "null": self.null_description,
             "coverage": {
-                "evaluated": self.coverage.evaluated, "intended": self.coverage.intended,
-                "timeouts": self.coverage.timeouts, "capped": self.coverage.capped,
+                "evaluated": self.coverage.evaluated,
+                "intended": self.coverage.intended,
+                "timeouts": self.coverage.timeouts,
+                "capped": self.coverage.capped,
                 "complete": self.coverage.complete,
             },
             "notes": list(self.notes),

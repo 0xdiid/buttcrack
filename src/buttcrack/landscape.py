@@ -51,7 +51,9 @@ class LocalMaxProbe:
 
     def summary(self) -> str:
         if self.is_local_max:
-            return f"truth is a local max over {self.n_neighbors} moves (score {self.true_score:.4f})"
+            return (
+                f"truth is a local max over {self.n_neighbors} moves (score {self.true_score:.4f})"
+            )
         return (
             f"truth is NOT a local max: {self.better_neighbors}/{self.n_neighbors} moves "
             f"score higher (best {self.best_neighbor_score:.4f} vs {self.true_score:.4f}) "
@@ -160,9 +162,7 @@ def identifiability(
     hits = 0
     details: list[dict] = []
     for seed in seed_keys:
-        end, score, steps = best_improvement_climb(
-            seed, neighbors, objective, max_steps=max_steps
-        )
+        end, score, steps = best_improvement_climb(seed, neighbors, objective, max_steps=max_steps)
         ok = bool(is_truth(end))
         hits += ok
         details.append({"seed": seed, "end": end, "score": score, "steps": steps, "reached": ok})

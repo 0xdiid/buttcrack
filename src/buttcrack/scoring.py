@@ -409,10 +409,10 @@ def excision_score(
             raise ValueError(f"excise_len must be in (0, {len(letters)}), got {excise_len}")
         best: tuple[float, int, str] | None = None
         for j in range(0, len(letters) - excise_len + 1, step):
-            kept = letters[:j] + letters[j + excise_len:]
+            kept = letters[:j] + letters[j + excise_len :]
             s = scorer.average(kept)
             if best is None or s > best[0]:
-                best = (s, j, letters[j:j + excise_len])
+                best = (s, j, letters[j : j + excise_len])
         assert best is not None
         return {"score": best[0], "at": best[1], "mode": mode, "excised": best[2]}
     if mode == "column":

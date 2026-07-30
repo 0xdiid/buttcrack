@@ -2678,7 +2678,9 @@ def lag_difference_scan(
             (sum((row[j] - mus[j]) ** 2 for row in null_rows) / samples) ** 0.5 or 1e-9
             for j in range(len(lags))
         ]
-        null_maxes = [max((row[j] - mus[j]) / sds[j] for j in range(len(lags))) for row in null_rows]
+        null_maxes = [
+            max((row[j] - mus[j]) / sds[j] for j in range(len(lags))) for row in null_rows
+        ]
         z_max = max(z_by_lag)
         scan_p = (sum(1 for m_ in null_maxes if m_ >= z_max) + 1) / (samples + 1)
 
@@ -2741,9 +2743,7 @@ def separable_pad_annihilator(
             counts = [0] * 26
             for d in e[r::classes]:
                 counts[d] += 1
-            total += max(
-                sum(counts[d] * log_g[shift][d] for d in range(26)) for shift in range(26)
-            )
+            total += max(sum(counts[d] * log_g[shift][d] for d in range(26)) for shift in range(26))
         return total
 
     def _stat(s: Sequence[int]) -> float:

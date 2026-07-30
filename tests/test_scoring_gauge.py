@@ -26,6 +26,7 @@ def _caesar(text: str, shift: int) -> str:
 
 # ------------------------------------------------------------- caesar gauge
 
+
 def test_best_caesar_gauge_recovers_the_applied_shift():
     for applied in (0, 3, 11, 25):
         shifted = _caesar(ENGLISH, applied)
@@ -54,6 +55,7 @@ def test_gauge_normalized_scorer_restores_gradient():
 
 
 # ------------------------------------------------------------- excision
+
 
 def test_excision_finds_a_contiguous_key_block():
     rng = random.Random(2)
@@ -87,6 +89,7 @@ def test_excision_rejects_bad_args():
 
 
 # ------------------------------------------------------------- anchors
+
 
 def test_anchored_english_near_one_random_near_zero():
     scorer = get_scorer()

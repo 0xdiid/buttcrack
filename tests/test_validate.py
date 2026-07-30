@@ -8,10 +8,10 @@ Two things must hold for the harness to be trustworthy:
 
 from __future__ import annotations
 
+from buttcrack import validate
 from buttcrack.ciphers.columnar import Columnar, _decode_letters, _read_order
 from buttcrack.layered import crack_quagmire_over_columnar
 from buttcrack.scoring import get_scorer
-from buttcrack import validate
 from buttcrack.validate import (
     STRUCTURES,
     SUBSTITUTIONS,
@@ -168,12 +168,12 @@ def test_random_key_is_deterministic_and_in_alphabet():
 
 # ------------------------------------------------------------ control battery
 
+
 def _good_attack(ct):
     """A working attack for the substitution family used by the battery specs."""
     from buttcrack.validate import decode_substitution
 
-    return [decode_substitution(ct, "PALIMPSEST", substitution="vigenere",
-                                alphabet="KRYPTOS")]
+    return [decode_substitution(ct, "PALIMPSEST", substitution="vigenere", alphabet="KRYPTOS")]
 
 
 def _broken_attack(ct):
@@ -185,8 +185,7 @@ def _battery_spec():
     from buttcrack.validate import encode_substitution
 
     pt = validate._FILLER[:200]
-    ct = encode_substitution(pt, "PALIMPSEST", substitution="vigenere",
-                             alphabet="KRYPTOS")
+    ct = encode_substitution(pt, "PALIMPSEST", substitution="vigenere", alphabet="KRYPTOS")
     sibling = {"ciphertext": ct, "plaintext": pt}
     plant = {
         "structure_spec": {"structure": "substitution"},

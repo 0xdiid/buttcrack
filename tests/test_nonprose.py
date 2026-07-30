@@ -90,6 +90,7 @@ def test_default_models_are_cached():
 
 # ------------------------------------------------------------ register corpora
 
+
 def test_register_corpus_deterministic_and_clean():
     from buttcrack.nonprose import REGISTERS, register_corpus
 
@@ -111,7 +112,7 @@ def test_register_corpus_rejects_unknown():
 
 def test_register_matched_model_beats_prose_on_its_own_register():
     """The gate that must pass before any search runs behind a register model."""
-    from buttcrack.nonprose import GenreModel, PROSE_SAMPLE, register_corpus
+    from buttcrack.nonprose import PROSE_SAMPLE, GenreModel, register_corpus
 
     for reg in ("telegraphic", "dates"):
         model = GenreModel.train(register_corpus(reg, sentences=400, seed=1))
