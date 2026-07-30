@@ -139,6 +139,40 @@ def block_shuffle(block: int) -> NullFn:
     return _null
 
 
+def null_is_degenerate(
+    seq: Sequence,
+    statistic: Statistic,
+    null_fn: NullFn,
+    *,
+    probes: int = 8,
+    rng: random.Random | None = None,
+    rel_tol: float = 1e-12,
+) -> bool:
+    """Is ``null_fn`` invisible to ``statistic`` — i.e. the wrong null for it?
+
+    The null-selection rule: an honest null preserves what the objective is GIVEN and
+    destroys what it puts UNDER TEST. Get it backwards and the null preserves the very
+    thing being tested — every draw returns the statistic's observed value bit-identically,
+    the null distribution is a single point, and the observation can never beat it. The
+    test then reports "not significant" forever, which reads exactly like a real negative.
+    (The canonical instance: a coset-preserving shuffle under a statistic that is a
+    function of coset *multisets* — merged-IC, coset-IC — which the shuffle preserves.)
+
+    This draws ``probes`` nulls and returns True when every draw reproduces the observed
+    statistic (within ``rel_tol`` relative tolerance). Run it before trusting any
+    ``p ≈ 1`` from :func:`null_test`; a degenerate pairing needs a *more destructive*
+    null (e.g. full :func:`permutation`), not more trials.
+    """
+    rng = rng or random.Random()
+    obs = float(statistic(seq))
+    scale = max(abs(obs), 1.0)
+    for _ in range(probes):
+        draw = float(statistic(null_fn(seq, rng)))
+        if abs(draw - obs) > rel_tol * scale:
+            return False
+    return True
+
+
 # --- the harness -------------------------------------------------------------
 
 
@@ -162,6 +196,7 @@ class NullResult:
     rank: int  # 1 = obs is the most extreme value seen (incl. obs itself)
     alternative: str
     null_samples: list[float] = field(default_factory=list, repr=False)
+    degenerate: bool = False
 
     @property
     def significant(self) -> bool:
@@ -169,11 +204,14 @@ class NullResult:
         return self.p_value < 0.05
 
     def summary(self) -> str:
-        return (
+        base = (
             f"obs={self.obs:.4f} vs null {self.null_mean:.4f}±{self.null_sd:.4f} "
             f"z={self.z:+.2f} p={self.p_value:.4f} ({self.alternative}) "
             f"rank={self.rank}/{self.trials + 1}"
         )
+        if self.degenerate:
+            base += " [DEGENERATE null: statistic invariant under it — pick a more destructive null]"
+        return base
 
 
 def _tail(obs: float, samples: list[float], alternative: str) -> tuple[int, int]:
@@ -211,10 +249,17 @@ def null_test(
 
     ``alternative`` picks the tail: ``"greater"`` (default; the statistic is a signal
     that should exceed the null), ``"less"``, or ``"two-sided"``.
+
+    The result carries ``degenerate=True`` when every null draw reproduced the observed
+    value — the statistic is *invariant* under this null (it preserves exactly what was
+    meant to be destroyed), so the ``p ≈ 1`` is an artifact of the pairing, not evidence.
+    See :func:`null_is_degenerate` for the selection rule.
     """
     rng = rng or random.Random()
     obs = float(statistic(seq))
     samples = [float(statistic(null_fn(seq, rng))) for _ in range(trials)]
+    scale = max(abs(obs), 1.0)
+    degenerate = bool(samples) and all(abs(s - obs) <= 1e-12 * scale for s in samples)
     mean = sum(samples) / trials if trials else obs
     var = sum((s - mean) ** 2 for s in samples) / trials if trials else 0.0
     sd = math.sqrt(var)
@@ -235,6 +280,7 @@ def null_test(
         rank=rank,
         alternative=alternative,
         null_samples=samples if keep_samples else [],
+        degenerate=degenerate,
     )
 
 
