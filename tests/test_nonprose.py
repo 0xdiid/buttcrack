@@ -86,3 +86,35 @@ def test_frac_axis_genre_typical_near_one_random_near_zero():
 
 def test_default_models_are_cached():
     assert default_models() is default_models()
+
+
+# ------------------------------------------------------------ register corpora
+
+def test_register_corpus_deterministic_and_clean():
+    from buttcrack.nonprose import REGISTERS, register_corpus
+
+    for reg in REGISTERS:
+        a = register_corpus(reg, sentences=40, seed=3)
+        b = register_corpus(reg, sentences=40, seed=3)
+        assert a == b, reg
+        assert a and all("A" <= c <= "Z" for c in a), reg
+
+
+def test_register_corpus_rejects_unknown():
+    import pytest
+
+    from buttcrack.nonprose import register_corpus
+
+    with pytest.raises(ValueError):
+        register_corpus("limericks")
+
+
+def test_register_matched_model_beats_prose_on_its_own_register():
+    """The gate that must pass before any search runs behind a register model."""
+    from buttcrack.nonprose import GenreModel, PROSE_SAMPLE, register_corpus
+
+    for reg in ("telegraphic", "dates"):
+        model = GenreModel.train(register_corpus(reg, sentences=400, seed=1))
+        prose = GenreModel.train(PROSE_SAMPLE)
+        sample = register_corpus(reg, sentences=30, seed=99)[:200]
+        assert model.score(sample) > prose.score(sample), reg
