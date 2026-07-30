@@ -41,6 +41,8 @@ number. That is the point: the type makes the unverified claim *unsayable*.
 
 from __future__ import annotations
 
+import math
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -50,11 +52,48 @@ __all__ = [
     "Coverage",
     "Finding",
     "MIN_PLANT_RECALL",
+    "MIN_POWER_Z",
+    "searched_fraction",
 ]
 
 #: A plant gate below this recall means the instrument cannot reliably find what it
 #: is looking for, so its silence carries no information.
 MIN_PLANT_RECALL = 0.5
+
+#: A stated power below this z means the statistic could not have seen the signal it
+#: was pointed at, so its null is SILENT (uninformative), not evidence of absence.
+MIN_POWER_Z = 3.0
+
+
+def searched_fraction(axes: Mapping[str, int], completed: int) -> dict[str, Any]:
+    """Multiply out the declared free axes of a search and report the fraction done.
+
+    A campaign repeatedly said "the search is finished" while quietly holding several
+    axes fixed (an orientation here, a gauge there); multiplying the *declared* axes
+    out overturned one such verdict by 2.5 orders of magnitude. This makes that
+    bookkeeping one call: ``axes`` maps each free axis to its cardinality (e.g.
+    ``{"orientation": 2, "period": 5, "square": 38_300_000}``), ``completed`` is how
+    many cells were actually evaluated. Returns ``{declared, completed, fraction,
+    axes, summary}``. Feed ``declared`` to :meth:`Finding.with_coverage` as
+    ``intended`` so the coverage claim and the axis arithmetic cannot drift apart.
+    """
+    if not axes:
+        raise ValueError("declare at least one axis")
+    for name, size in axes.items():
+        if size < 1:
+            raise ValueError(f"axis {name!r} must have cardinality >= 1, got {size}")
+    declared = math.prod(axes.values())
+    if completed < 0 or completed > declared:
+        raise ValueError(f"completed must be within [0, {declared}], got {completed}")
+    fraction = completed / declared
+    dims = " x ".join(f"{name}={size:,}" for name, size in axes.items())
+    return {
+        "declared": declared,
+        "completed": completed,
+        "fraction": fraction,
+        "axes": dict(axes),
+        "summary": f"{dims} = {declared:,} cells; {completed:,} done ({100 * fraction:.2g}%)",
+    }
 
 
 class Unverified(RuntimeError):
@@ -133,6 +172,18 @@ class Coverage:
         return (f"covered {self.evaluated:,}/{self.intended:,} "
                 f"({100 * self.fraction:.1f}%){extra}")
 
+    @classmethod
+    def of_axes(cls, evaluated: int, *, timeouts: int = 0, capped: int = 0,
+                exhaustive: bool = False, **axes: int) -> Coverage:
+        """Coverage whose ``intended`` is the product of the declared free axes.
+
+        ``Coverage.of_axes(500_000, orientation=2, square=38_300_000)`` cannot
+        understate the space the way a hand-typed ``intended`` can — see
+        :func:`searched_fraction`.
+        """
+        sf = searched_fraction(axes, evaluated)
+        return cls(evaluated, sf["declared"], timeouts, capped, exhaustive)
+
 
 @dataclass
 class Finding:
@@ -154,6 +205,10 @@ class Finding:
     null_description: str | None = None
     family_size: int = 1
     notes: list[str] = field(default_factory=list)
+    power_z: float | None = None
+    not_closed: list[str] = field(default_factory=list)
+    reopen_delta: str | None = None
+    void_reason: str | None = None
 
     # ------------------------------------------------------------------ builders
 
@@ -180,6 +235,47 @@ class Finding:
         if size < 1:
             raise ValueError("family_size must be >= 1")
         self.family_size = size
+        return self
+
+    def with_power(self, z: float) -> Finding:
+        """Attach the measured power of the statistic on same-shape plants.
+
+        ``z`` is how many null standard deviations the statistic sits above its null
+        on synthetics *carrying the signal under test* (:func:`buttcrack.power.separation`).
+        A negative with power below :data:`MIN_POWER_Z` is reported as ``silent`` —
+        the statistic could not have seen the signal, so its quiet means nothing.
+        Without this attestation a negative keeps its legacy verdicts, but stating a
+        measured power is what upgrades "we saw nothing" to "there is nothing".
+        """
+        self.power_z = float(z)
+        return self
+
+    def scoped(self, not_closed: list[str], reopen_delta: str | None = None) -> Finding:
+        """Declare what this negative deliberately does NOT close, and what reopens it.
+
+        A narrow null cited as a family kill is how live hypotheses die in the record.
+        ``not_closed`` names the adjacent cells left open (e.g. ``["non-standard ring",
+        "terse register"]``); ``reopen_delta`` states the observation that would justify
+        reopening. A closed finding with a non-empty ``not_closed`` renders its verdict
+        as ``closed (scoped)`` so it can never be quoted as broader than it is.
+        """
+        self.not_closed = list(not_closed)
+        self.reopen_delta = reopen_delta
+        return self
+
+    def voided(self, reason: str) -> Finding:
+        """Mark the finding VOID: the instrument itself was broken, so the result is
+        meaningless — which is a different thing from a trusted negative.
+
+        The distinction exists because a broken harness produces output
+        indistinguishable from a clean null (a solver handed a file *path* instead of
+        ciphertext once scored 47k cells of heap garbage and passed its own screen).
+        A void finding renders — stating WHY it is void — but can never be cited as
+        evidence for or against anything.
+        """
+        if not reason.strip():
+            raise ValueError("state what broke the instrument")
+        self.void_reason = reason
         return self
 
     # ------------------------------------------------------------------ verdict
@@ -212,7 +308,17 @@ class Finding:
         return gaps
 
     def verdict(self) -> str:
-        """One of: 'closed', 'null (partial)', 'inconclusive', 'positive'."""
+        """One of: 'void', 'positive', 'silent', 'closed', 'closed (scoped)',
+        'inconclusive', 'null (partial)'.
+
+        ``void`` — the instrument was broken; the result means nothing either way.
+        ``silent`` — a negative whose stated power is below :data:`MIN_POWER_Z`; the
+        statistic could not have seen the signal, so the null is not evidence.
+        ``closed (scoped)`` — a complete negative that has declared adjacent cells it
+        does NOT close (:meth:`scoped`).
+        """
+        if self.void_reason is not None:
+            return "void"
         gaps = self.missing()
         if gaps:
             raise Unverified(
@@ -221,35 +327,54 @@ class Finding:
         cp = self.corrected_p
         if cp is not None and cp < 0.05:
             return "positive"
+        if self.power_z is not None and self.power_z < MIN_POWER_Z:
+            return "silent"
         if self.coverage.complete or self.coverage.exhaustive:
-            return "closed"
+            return "closed (scoped)" if self.not_closed else "closed"
         if self.coverage.timeouts or self.coverage.capped:
             return "inconclusive"
         return "null (partial)"
 
     def render(self) -> str:
         v = self.verdict()          # raises Unverified if unearned
-        assert self.plant is not None and self.coverage is not None
         lines = [f"{self.claim}", f"  verdict     : {v}"]
+        if v == "void":
+            lines.append(f"  void        : {self.void_reason}")
+            lines.append("  (instrument broken — citable as neither positive nor negative)")
+            return "\n".join(lines)
+        assert self.plant is not None and self.coverage is not None
         if self.observed is not None:
             lines.append(f"  observed    : {self.observed:.4f}")
         if self.p_value is not None:
             lines.append(f"  p           : {self.p_value:.4g} raw, "
                          f"{self.corrected_p:.4g} corrected over "
                          f"{self.family_size} hypotheses")
+        if self.power_z is not None:
+            lines.append(f"  power       : z={self.power_z:+.2f} on same-shape plants"
+                         + ("" if self.power_z >= MIN_POWER_Z
+                            else f" (below {MIN_POWER_Z:.0f} — null is SILENT)"))
         lines.append(f"  {self.plant.summary()}")
         lines.append(f"  null        : {self.null_description}")
         lines.append(f"  {self.coverage.summary()}")
+        for cell in self.not_closed:
+            lines.append(f"  not closed  : {cell}")
+        if self.reopen_delta:
+            lines.append(f"  reopen if   : {self.reopen_delta}")
         for n in self.notes:
             lines.append(f"  note        : {n}")
         return "\n".join(lines)
 
     def to_dict(self) -> dict[str, Any]:
         v = self.verdict()
+        if v == "void":
+            return {"claim": self.claim, "verdict": v, "void_reason": self.void_reason}
         assert self.plant is not None and self.coverage is not None
         return {
             "claim": self.claim,
             "verdict": v,
+            "power_z": self.power_z,
+            "not_closed": list(self.not_closed),
+            "reopen_delta": self.reopen_delta,
             "observed": self.observed,
             "p_value": self.p_value,
             "corrected_p": self.corrected_p,

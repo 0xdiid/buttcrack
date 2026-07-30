@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from buttcrack.evidence import Coverage, Finding, PlantGate, Unverified
+from buttcrack.evidence import Coverage, Finding, PlantGate, Unverified, searched_fraction
 
 # --------------------------------------------------------------------- basics
 
@@ -140,3 +140,82 @@ def test_to_dict_round_trips_the_attestations():
     assert d["plant"]["recall"] == 1.0
     assert d["coverage"]["complete"] is True
     assert d["corrected_p"] is not None
+
+
+# --------------------------------------------------------------- searched fraction
+
+def test_searched_fraction_multiplies_axes():
+    sf = searched_fraction({"orientation": 2, "period": 5, "square": 100}, 250)
+    assert sf["declared"] == 1000
+    assert sf["fraction"] == pytest.approx(0.25)
+    assert "orientation=2" in sf["summary"]
+
+
+def test_searched_fraction_rejects_overcount_and_empty():
+    with pytest.raises(ValueError):
+        searched_fraction({}, 0)
+    with pytest.raises(ValueError):
+        searched_fraction({"a": 10}, 11)
+
+
+def test_coverage_of_axes_matches_product():
+    cov = Coverage.of_axes(50, orientation=2, square=100)
+    assert cov.intended == 200
+    assert cov.evaluated == 50
+
+
+# --------------------------------------------------------------- power / silent
+
+def _closed_negative(**kwargs):
+    return (Finding("no signal", **kwargs)
+            .with_plant(5, 5, "bifid5", "English prose")
+            .with_null("within-coset shuffle: preserves coset multisets, destroys order",
+                       p_value=0.4)
+            .with_coverage(100, 100, exhaustive=True))
+
+
+def test_negative_without_power_keeps_legacy_verdict():
+    assert _closed_negative().verdict() == "closed"
+
+
+def test_underpowered_negative_is_silent_not_closed():
+    f = _closed_negative().with_power(1.2)
+    assert f.verdict() == "silent"
+    assert "SILENT" in f.render()
+
+
+def test_powered_negative_still_closes():
+    assert _closed_negative().with_power(8.0).verdict() == "closed"
+
+
+def test_power_does_not_suppress_a_positive():
+    f = _closed_negative().with_power(1.2)
+    f.p_value = 0.001
+    f.family_size = 1
+    assert f.verdict() == "positive"
+
+
+# --------------------------------------------------------------- scoped negatives
+
+def test_scoped_negative_renders_as_closed_scoped():
+    f = _closed_negative().scoped(["non-standard ring", "terse register"],
+                                  "any ring with alignability z > 3")
+    assert f.verdict() == "closed (scoped)"
+    out = f.render()
+    assert "not closed  : non-standard ring" in out
+    assert "reopen if" in out
+    assert f.to_dict()["not_closed"] == ["non-standard ring", "terse register"]
+
+
+# --------------------------------------------------------------- void
+
+def test_void_renders_without_attestations():
+    f = Finding("47k cells scored").voided("solver was handed a file path, scored heap garbage")
+    assert f.verdict() == "void"
+    assert "instrument broken" in f.render()
+    assert f.to_dict()["void_reason"].startswith("solver was handed")
+
+
+def test_void_reason_must_be_stated():
+    with pytest.raises(ValueError):
+        Finding("x").voided("  ")
