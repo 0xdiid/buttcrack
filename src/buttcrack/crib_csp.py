@@ -219,7 +219,10 @@ def solve_bifid_crib(
 
     sols: list[CribSolution] = []
 
-    class _Collect(cp_model.CpSolverSolutionCallback):
+    # The base class lives on the lazily-imported module object, which mypy cannot
+    # resolve as a name at class-definition time (the lazy import is what keeps
+    # ortools an optional [csp] extra).
+    class _Collect(cp_model.CpSolverSolutionCallback):  # type: ignore[name-defined]
         def __init__(self) -> None:
             super().__init__()
             self.n = 0
