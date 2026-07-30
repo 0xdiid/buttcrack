@@ -6,6 +6,75 @@ and not yet published, so changes are grouped by milestone rather than release.
 
 ## Unreleased
 
+### Added — methodology instruments generalized from the campaign scripts and allied solvers’ tooling
+
+A second consolidation sweep, this time over the *methodology* (not cipher mechanics)
+buried in ~400 campaign scripts and several independent solvers' tooling. Everything
+below is puzzle-agnostic, plant-gated in tests, and carries the measured lesson that
+motivated it in its docstring.
+
+- **`buttcrack.evidence` upgrades** — `searched_fraction`/`Coverage.of_axes` (the
+  intended-space size is the product of the *declared* free axes, so a coverage claim
+  cannot silently hold an axis fixed — one such multiplication overturned a "search is
+  finished" verdict by 2.5 orders of magnitude); `Finding.with_power` (a negative whose
+  measured power on same-shape plants is below z=3 renders as **silent**, not closed);
+  `Finding.scoped` (`closed (scoped)` verdict with `not_closed`/`reopen_delta`, so a
+  narrow null can never be quoted as a family kill); `Finding.voided` (**void**: a
+  broken-instrument result, citable as neither positive nor negative).
+- **`buttcrack.power` upgrades** — `expected_null_max`/`bank_scaling` (the noise-bank
+  max grows like `sqrt(2 ln n)`; compute the margin BEFORE scaling a 200-candidate test
+  to 7,000, because the scaling can destroy the power that justified it);
+  `labeling_power` (2-sample AUC vs held-out 1-sample accuracy — different questions,
+  and conflating them produced a real false closure); `family_power` (per-family plant
+  calibration turning any statistic into a detector with measured power).
+- **`buttcrack.nulls` degenerate-null guard** — `null_is_degenerate` +
+  `NullResult.degenerate` encode the selection rule *preserve what the objective is
+  given, destroy what it puts under test*: a statistic that is a function of what the
+  null preserves yields a point-mass null whose p≈1 reads exactly like a real negative.
+- **`buttcrack.scoring` upgrades** — `GaugeNormalizedScorer` (an omitted/relabelled
+  alphabet letter is a *gauge*; unigram-fit picks the Caesar frame before n-gram
+  scoring, restoring the gradient a cliff landscape hides — one wrong gauge value was a
+  measured 84% of the drop); `excision_score` (score exactly the letters a
+  contamination hypothesis claims are language); `NgramScorer.anchored`/`anchored_score`
+  (normalize every model to its own random/language anchors so scores are comparable
+  across models — the non-prose blind-spot exposer).
+- **`buttcrack.analysis` additions** — `harmonic_corroboration` (a real period p
+  FORCES elevation at 2p; {p,2p} is one signal, not two multiplicity draws);
+  `lag_difference_scan` (the mod-26 lag-difference stream goes plaintext-like for a
+  cycled running key and IS the plaintext for a ciphertext autokey; empirical
+  permutation null with scan-max correction — the analytic iid variance is
+  measured-wrong by ~6 sigma of overlap dependence); `separable_pad_annihilator`
+  (key-free detector for `a[i%p]+b[i%q]` pads; the naive both-streams second
+  difference is measured-powerless, the shipped single-difference + per-class
+  best-shift LLR design reaches z≈3 at 450 letters).
+- **`buttcrack.landscape` (new)** — objective-landscape profiling to run on a plant
+  BEFORE scaling a search: `local_max_probe` (truth not a local max ⇒ dead lane, no
+  search improvement helps), `identifiability` (basin probes with
+  identifiable/needs-richer-seeds/dead-lane verdicts), `crib_floor` (recovery vs
+  letters locked — the honest "how much crib does the attack need" number),
+  `damage_ladder` (adjacent-level AUC; flags the cliff shape where "SA reached 84% of
+  the score" means nothing).
+- **`buttcrack.climbgate` (new)** — solver-as-detector: run every registered cracker
+  at the target's exact length on its own plant (GATE), random letters (CTRL) and the
+  target, anchor the target between the bands, and suppress UNGATED rows (a solver
+  that cannot find its own planted answer says nothing about the target either way).
+  `length_threshold` separates "cipher is unclimbable" from "text is too short".
+- **`buttcrack.contamination` (new)** — `embed` plants k non-language characters in
+  the shapes real constructions embed them (contiguous / scattered / grid-column /
+  periodic-coset); `sensitivity_sweep` reports the per-shape insert **budget** at
+  which an exclusion built on a statistic dissolves.
+- **`buttcrack.validate.control_battery`** — grade an attack **TRUSTED** or **VOID**
+  before its negatives enter the record: Tier A reproduces a solved sibling in top-N;
+  Tier B recovers the attack's own plant built by the library's trusted encoder (never
+  the attack under test). Feeds `Finding.voided` directly.
+- **`buttcrack.nonprose.register_corpus`** — deterministic synthetic corpora for
+  wordlist/dates/telegraphic/numeric registers (plant-gate recall is
+  register-specific; a register model must beat the prose model on its own register
+  before any search runs behind it).
+- Also merged from a stranded local branch: `buttcrack.census` (family-level exclusion
+  census), `buttcrack.crib_csp` (CP-SAT known-plaintext recovery for bifid5),
+  `buttcrack.evidence` itself, and `analysis.schedule_conditioned_fit`.
+
 ### Added — Josse cipher (new cipher type)
 
 **`josse`** — ciphertext-autokey over a keyed mixed alphabet (Maj. H. D. Josse, French

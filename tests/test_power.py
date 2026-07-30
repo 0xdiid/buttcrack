@@ -109,8 +109,10 @@ def test_power_curve_records_recovery_rate():
 
 # ------------------------------------------------------- best-of-N null growth
 
+
 def test_expected_null_max_grows_like_sqrt_log():
     import math
+
     assert power.expected_null_max(0.0, 1.0, 1) == 0.0
     z200 = power.expected_null_max(0.0, 1.0, 200)
     z7000 = power.expected_null_max(0.0, 1.0, 7000)
@@ -133,6 +135,7 @@ def test_bank_scaling_strong_signal_survives():
 
 # --------------------------------------------- 2-sample vs 1-sample distinction
 
+
 def test_labeling_power_separable_and_labelable():
     rng = random.Random(7)
     sig = [10 + rng.gauss(0, 1) for _ in range(50)]
@@ -154,11 +157,13 @@ def test_labeling_power_separable_but_not_labelable():
 
 # ------------------------------------------------------------- family power
 
-def test_family_power_separates_signal_family_from_noise_family():
-    from buttcrack.scoring import index_of_coincidence
 
-    english = ("THEQUICKBROWNFOXJUMPSOVERTHELAZYDOGWHILETHERIVERRUNSPASTTHEOLD"
-               "STONEBRIDGEANDTHECHILDRENPLAYALONGTHEGRASSYBANKSOFTHETOWN")
+def test_family_power_separates_signal_family_from_noise_family():
+
+    english = (
+        "THEQUICKBROWNFOXJUMPSOVERTHELAZYDOGWHILETHERIVERRUNSPASTTHEOLD"
+        "STONEBRIDGEANDTHECHILDRENPLAYALONGTHEGRASSYBANKSOFTHETOWN"
+    )
 
     def gen_english(rng):
         return english
@@ -174,6 +179,7 @@ def test_family_power_separates_signal_family_from_noise_family():
     def bigram_repeat(text):
         # order-sensitive statistic: fraction of adjacent equal-letter-class pairs
         from buttcrack.scoring import get_scorer
+
         return get_scorer("bigrams").score(text)
 
     res = power.family_power(

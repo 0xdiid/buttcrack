@@ -40,8 +40,6 @@ def test_ungated_solver_is_suppressed_not_believed():
 
 
 def test_length_threshold_turns_on_with_n():
-    res = climbgate.length_threshold(
-        "caesar", [3, 120], trials=2, rng=random.Random(7)
-    )
+    res = climbgate.length_threshold("caesar", [3, 120], trials=2, rng=random.Random(7))
     assert res["threshold"] == 120, res
     assert res["curve"][0]["gated"] is False

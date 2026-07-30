@@ -194,9 +194,7 @@ def census(
     rng = random.Random(seed)
     names = families if families is not None else [c.name for c in all_ciphers()]
     profs = [
-        profile_family(
-            n, plaintexts, statistic, n_samples=n_samples, rng=rng, words=words
-        )
+        profile_family(n, plaintexts, statistic, n_samples=n_samples, rng=rng, words=words)
         for n in names
     ]
 
