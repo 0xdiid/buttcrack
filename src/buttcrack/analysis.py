@@ -533,6 +533,18 @@ _STD_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 INNER_CLASSES = ("language", "playfair", "bifid", "four_square", "hill2", "uniform")
 
 
+def _language_freq(language: str) -> list[float]:
+    """Monogram frequencies of ``language`` as a 26-vector indexed by A=0..Z=25."""
+    if language == "english":
+        return [ENGLISH_MONOGRAM_FREQ[chr(65 + i)] for i in range(26)]
+    from .scoring import get_scorer
+
+    lp = get_scorer("monograms", language).log_probs
+    freqs = [10.0 ** lp.get(chr(65 + i), -6.0) for i in range(26)]
+    total = sum(freqs)
+    return [f / total for f in freqs]
+
+
 def _sample_language_letters(m: int, rng: random.Random, freqs: dict[str, float]) -> str:
     """``m`` letters drawn from a language's monogram distribution (reproduces its IoC exactly)."""
     letters = list(freqs)
@@ -2497,4 +2509,261 @@ def schedule_conditioned_fit(
         "ioc": round(ic, 4),
         "z": z,
         "snaps": snaps,
+    }
+
+
+def harmonic_corroboration(
+    letters: str,
+    period: int,
+    *,
+    samples: int = 400,
+    seed: int = 20250615,
+) -> dict:
+    """Corroborate (or undercut) a claimed period ``p`` via its harmonic ``2p``.
+
+    A genuine period-``p`` layer makes the period-``2p`` cosets *subsets* of the
+    period-``p`` cosets, so if ``p`` is real, ``2p`` MUST also be elevated — the pair
+    ``{p, 2p}`` is one signal, not two independent multiplicity draws. Conversely a
+    lone spike at ``p`` with a flat ``2p`` is the signature of a selection artifact.
+    This complements :func:`period_family_significance` (which corrects a scan-wide
+    max): here the question is not "is the best period significant?" but "does the
+    specific period the frame claims show the harmonic consistency it is REQUIRED to
+    show?" — a cheap refutation lever for a single pinned hypothesis.
+
+    Tests, against a whole-text permutation null:
+
+    * ``joint_p`` — probability a null draw's *minimum* of the two coset-IoC z-scores
+      (at ``p`` and ``2p``) reaches the observed minimum. Both must be elevated to
+      score; one flat member kills it.
+    * ``pair_shape_p`` — probability that in a null draw, some harmonic pair
+      ``{q, 2q}`` (2 ≤ q ≤ max scanned) jointly beats the observed ``{p, 2p}``
+      minimum — the look-elsewhere-corrected version over all harmonic pairs.
+
+    Returns ``{period, z_base, z_double, joint_min_z, joint_p, pair_shape_p,
+    corroborated}`` where ``corroborated`` requires ``joint_p < 0.05``.
+    """
+    letters = only_letters(letters)
+    n = len(letters)
+    if period < 2 or 2 * period > max(1, n // 2):
+        raise ValueError(f"need 2 <= period and 2*period <= n/2 (period={period}, n={n})")
+    rng = random.Random(seed)
+
+    def _coset_ioc(text: str, p: int) -> float:
+        cols = [text[j::p] for j in range(p)]
+        vals = [index_of_coincidence(c) for c in cols if len(c) >= 2]
+        return sum(vals) / len(vals) if vals else 0.0
+
+    max_q = n // 4  # largest base whose double still has >= 2 letters per coset
+    qs = [q for q in range(2, max_q + 1)]
+    if period not in qs:
+        raise ValueError(f"period {period} out of testable range 2..{max_q}")
+
+    obs = {q: _coset_ioc(letters, q) for q in set(qs) | {2 * q for q in qs}}
+    draws: list[dict[int, float]] = []
+    for _ in range(samples):
+        chars = list(letters)
+        rng.shuffle(chars)
+        t = "".join(chars)
+        draws.append({q: _coset_ioc(t, q) for q in obs})
+
+    mu_sd = {}
+    for q in obs:
+        vals = [d[q] for d in draws]
+        mu = sum(vals) / len(vals)
+        sd = (sum((v - mu) ** 2 for v in vals) / len(vals)) ** 0.5 or 1e-9
+        mu_sd[q] = (mu, sd)
+
+    def _z(row: dict[int, float], q: int) -> float:
+        mu, sd = mu_sd[q]
+        return (row[q] - mu) / sd
+
+    z_base = _z(obs, period)
+    z_double = _z(obs, 2 * period)
+    joint_obs = min(z_base, z_double)
+
+    joint_ge = sum(1 for d in draws if min(_z(d, period), _z(d, 2 * period)) >= joint_obs)
+    joint_p = (joint_ge + 1) / (samples + 1)
+
+    def _best_pair(row: dict[int, float]) -> float:
+        return max(min(_z(row, q), _z(row, 2 * q)) for q in qs)
+
+    pair_ge = sum(1 for d in draws if _best_pair(d) >= joint_obs)
+    pair_shape_p = (pair_ge + 1) / (samples + 1)
+
+    return {
+        "period": period,
+        "z_base": round(z_base, 2),
+        "z_double": round(z_double, 2),
+        "joint_min_z": round(joint_obs, 2),
+        "joint_p": round(joint_p, 4),
+        "pair_shape_p": round(pair_shape_p, 4),
+        "corroborated": joint_p < 0.05,
+    }
+
+
+def lag_difference_scan(
+    letters: str,
+    *,
+    max_lag: int = 40,
+    alphabet: str = "STANDARD",
+    top: int = 6,
+    samples: int = 150,
+    seed: int = 20250615,
+) -> dict:
+    """IoC of the mod-26 lag-``L`` difference stream, for each lag — the cycled-key
+    and ciphertext-autokey detector.
+
+    The difference stream ``d[i] = ct[i] - ct[i-L] (mod 26)`` goes *plaintext-like*
+    in exactly two constructions, and this scan reads both off with no key search:
+
+    * a **running key reused / cycled with period L** (``ct = pt + k``):
+      ``d[i] = pt[i] - pt[i-L]`` — the difference of two English letters, whose
+      distribution is peaked, so the stream's IoC rises above flat;
+    * a **ciphertext autokey with lag L** (``ct[i] = pt[i] + ct[i-L]``): ``d`` IS the
+      plaintext (up to the primer), so the stream's IoC approaches the language IoC
+      — and the stream itself is worth reading (:func:`buttcrack.scoring.get_scorer`).
+
+    Distinct from :func:`kappa_spectrum` (which counts positions where
+    ``ct[i] == ct[i+L]`` — the L-th *coincidence* rate); the difference stream sees
+    structure kappa cannot, because it uses the full distribution of ``d``, not only
+    its zero bin.
+
+    The null is a whole-text permutation, drawn empirically — an analytic i.i.d.
+    variance is WRONG here (measured z ≈ 6 on plain random text): ``d[i]`` and
+    ``d[i+L]`` share the letter ``ct[i]``, and that overlap dependence inflates the
+    IoC's variance well beyond the independent-pairs formula. Because the scan keeps
+    the best of ``max_lag`` lags, ``scan_p`` reports the honest max-corrected
+    p-value: the fraction of null draws whose own best lag beats the observed best.
+
+    Returns ``{lags, scan_p}`` — ``lags`` is the ``top`` lags by z as ``{lag, ioc,
+    z, head}``, ``head`` being the first 24 letters of the difference stream
+    (eyeball it — an autokey's reads as text).
+    """
+    ring = _alphabet(alphabet)
+    ring_idx = {c: i for i, c in enumerate(ring)}
+    seq = [ring_idx[c] for c in only_letters(letters) if c in ring_idx]
+    n = len(seq)
+    lags = [lag for lag in range(1, min(max_lag, n - 20) + 1) if n - lag >= 20]
+
+    def _ioc_at(s: Sequence[int], lag: int) -> float:
+        counts = [0] * 26
+        for i in range(lag, len(s)):
+            counts[(s[i] - s[i - lag]) % 26] += 1
+        m = len(s) - lag
+        return sum(c * (c - 1) for c in counts) / (m * (m - 1)) if m > 1 else 0.0
+
+    rng = random.Random(seed)
+    null_rows: list[list[float]] = []
+    for _ in range(samples):
+        sh = list(seq)
+        rng.shuffle(sh)
+        null_rows.append([_ioc_at(sh, lag) for lag in lags])
+
+    out: list[dict] = []
+    z_by_lag: list[float] = []
+    for j, lag in enumerate(lags):
+        obs = _ioc_at(seq, lag)
+        col = [row[j] for row in null_rows]
+        mu = sum(col) / len(col)
+        sd = (sum((v - mu) ** 2 for v in col) / len(col)) ** 0.5 or 1e-9
+        z = (obs - mu) / sd
+        z_by_lag.append(z)
+        head = "".join(ring[(seq[i] - seq[i - lag]) % 26] for i in range(lag, min(lag + 24, n)))
+        out.append({"lag": lag, "ioc": round(obs, 4), "z": round(z, 2), "head": head})
+
+    scan_p = 1.0
+    if out:
+        mus = [sum(row[j] for row in null_rows) / samples for j in range(len(lags))]
+        sds = [
+            (sum((row[j] - mus[j]) ** 2 for row in null_rows) / samples) ** 0.5 or 1e-9
+            for j in range(len(lags))
+        ]
+        null_maxes = [max((row[j] - mus[j]) / sds[j] for j in range(len(lags))) for row in null_rows]
+        z_max = max(z_by_lag)
+        scan_p = (sum(1 for m_ in null_maxes if m_ >= z_max) + 1) / (samples + 1)
+
+    out.sort(key=lambda r: r["z"], reverse=True)
+    return {"lags": out[:top], "scan_p": round(scan_p, 4)}
+
+
+def separable_pad_annihilator(
+    letters: str,
+    p: int,
+    q: int,
+    *,
+    samples: int = 300,
+    alphabet: str = "STANDARD",
+    language: str = "english",
+    seed: int = 20250615,
+) -> dict:
+    """Key-free test for a SEPARABLE two-period additive pad ``k[i] = a[i%p] + b[i%q]``.
+
+    The lag-``p`` difference ``e[i] = ct[i] - ct[i+p] (mod 26)`` annihilates the
+    ``a`` stream exactly (equal residues mod p), leaving ``e[i] = pt[i] - pt[i+p] +
+    (b[i%q] - b[(i+p)%q])``. Within one residue class mod ``q`` the ``b`` term is a
+    *constant*, so each class's histogram is the English letter-difference
+    distribution shifted by an unknown offset — matched here by the best-shift
+    log-likelihood against that predicted distribution, summed over classes, plus
+    the mirrored ``(q, p)`` orientation. Every key value cancels or is absorbed:
+    the statistic sees construction, not key.
+
+    A design note with a measured lesson: the tempting one-shot statistic — IoC of
+    the mixed second difference ``ct[i] - ct[i+p] - ct[i+q] + ct[i+p+q]``, which
+    annihilates both streams at once — is POWERLESS (measured z ≈ 0 on true plants):
+    two difference-convolutions flatten the English letter distribution to within
+    ~1e-4 of uniform. One difference plus per-class shift-matching keeps the signal.
+
+    z is against a whole-text permutation null (same ciphertext letters, no
+    positional structure). Measured power on English plants: turns on around ~450
+    letters (z ≈ 3), z ≈ 7+ by 1200; a same-length non-separable long-key control
+    sits near z ≈ 1. Below ~450 letters a null here is SILENT, not negative —
+    calibrate with :func:`buttcrack.power.family_power` at your exact length.
+
+    Returns ``{p, q, llr, null_mean, null_sd, z, n_terms}``.
+    """
+    if p < 1 or q < 1 or p == q:
+        raise ValueError(f"need distinct positive periods, got p={p} q={q}")
+    ring = _alphabet(alphabet)
+    ring_idx = {c: i for i, c in enumerate(ring)}
+    seq = [ring_idx[c] for c in only_letters(letters) if c in ring_idx]
+    n = len(seq)
+    if n - (p + q) < 40:
+        raise ValueError(f"text too short for periods ({n} letters, p+q={p + q})")
+
+    freq = _language_freq(language)
+    g = [sum(freq[a] * freq[(a - d) % 26] for a in range(26)) for d in range(26)]
+    log_g = [[math.log(g[(d - s) % 26] * 26.0) for d in range(26)] for s in range(26)]
+
+    def _llr(s: Sequence[int], lag: int, classes: int) -> float:
+        e = [(s[i] - s[i + lag]) % 26 for i in range(len(s) - lag)]
+        total = 0.0
+        for r in range(classes):
+            counts = [0] * 26
+            for d in e[r::classes]:
+                counts[d] += 1
+            total += max(
+                sum(counts[d] * log_g[shift][d] for d in range(26)) for shift in range(26)
+            )
+        return total
+
+    def _stat(s: Sequence[int]) -> float:
+        return _llr(s, p, q) + _llr(s, q, p)
+
+    obs = _stat(seq)
+    rng = random.Random(seed)
+    draws = []
+    for _ in range(samples):
+        sh = list(seq)
+        rng.shuffle(sh)
+        draws.append(_stat(sh))
+    mu = sum(draws) / len(draws)
+    sd = (sum((x - mu) ** 2 for x in draws) / len(draws)) ** 0.5 or 1e-9
+    return {
+        "p": p,
+        "q": q,
+        "llr": round(obs, 2),
+        "null_mean": round(mu, 2),
+        "null_sd": round(sd, 3),
+        "z": round((obs - mu) / sd, 2),
+        "n_terms": n - p - q,
     }
