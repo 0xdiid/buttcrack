@@ -97,9 +97,7 @@ def parse_plugboard(spec: str) -> list[int]:
 
 
 def plugboard_repr(board: list[int]) -> str:
-    return " ".join(
-        f"{chr(a + A)}{chr(board[a] + A)}" for a in range(26) if board[a] > a
-    )
+    return " ".join(f"{chr(a + A)}{chr(board[a] + A)}" for a in range(26) if board[a] > a)
 
 
 class EnigmaMachine:
@@ -302,9 +300,7 @@ class Enigma(Cipher):
                 break
             # The right ring is already pinned when phase 1 swept it; otherwise it is
             # still open and gets swept here alongside the middle one.
-            right_range = (
-                [ord(found_rings[2]) - A] if opts.get("ring_sweep") else list(range(26))
-            )
+            right_range = [ord(found_rings[2]) - A] if opts.get("ring_sweep") else list(range(26))
             for ring_mid in range(26):
                 for ring_right in right_range:
                     rings = f"A{chr(ring_mid + A)}{chr(ring_right + A)}"

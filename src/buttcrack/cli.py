@@ -1398,10 +1398,7 @@ def _cmd_stats(args) -> int:
             print(f"autocorrelation top lags (max_lag={auto['max_lag']}): {top}")
             fams = auto["harmonic_families"][:4]
             if fams:
-                shown = "  ".join(
-                    f"p={f['period']}(family z{f['family_z']})"
-                    for f in fams
-                )
+                shown = "  ".join(f"p={f['period']}(family z{f['family_z']})" for f in fams)
                 print(f"  harmonic families: {shown}")
             if auto["best_period"]:
                 print(f"  -> {auto['verdict']}: {auto['best_period']}")
@@ -2105,9 +2102,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--max-keysize", type=int, default=40, help="longest XOR key to try (default 40)"
     )
-    p.add_argument(
-        "--apply", metavar="KIND", help="peel one named wrapper (see --list-wrappers)"
-    )
+    p.add_argument("--apply", metavar="KIND", help="peel one named wrapper (see --list-wrappers)")
     p.add_argument("--wrap", metavar="KIND", help="apply one named wrapper (the encode direction)")
     p.add_argument(
         "--transcribe",

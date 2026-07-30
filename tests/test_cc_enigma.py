@@ -217,9 +217,10 @@ def test_short_probe_loses_a_non_trivial_ring_setting(probe):
 
 
 def test_full_probe_recovers_what_the_short_probe_loses():
-    assert _crack("I II III/B/ABQ/QMT", rotor_orders=[("I", "II", "III")])[0].plaintext[
-        :60
-    ] == TARGET[:60]
+    assert (
+        _crack("I II III/B/ABQ/QMT", rotor_orders=[("I", "II", "III")])[0].plaintext[:60]
+        == TARGET[:60]
+    )
 
 
 def test_ring_sweep_recovers_order_and_rings_together():

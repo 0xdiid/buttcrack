@@ -14,8 +14,8 @@ from .bazeries import Bazeries
 from .beaufort import Beaufort
 from .bifid import Bifid
 from .cadenus import Cadenus
-from .chaocipher import Chaocipher
 from .caesar import Caesar, Rot13
+from .chaocipher import Chaocipher
 from .checkerboard import Checkerboard
 from .cm_bifid import CMBifid
 from .collon import Collon
@@ -38,9 +38,9 @@ from .interrupted_key import InterruptedKey
 from .josse import Josse
 from .key_phrase import KeyPhrase
 from .keystream import LcgKeystream, LinearRecurrenceKeystream
+from .m94 import M94
 from .monome_dinome import MonomeDinome
 from .morbit import Morbit
-from .m94 import M94
 from .myszkowski import Myszkowski
 from .nicodemus import Nicodemus
 from .nihilist_substitution import NihilistSubstitution

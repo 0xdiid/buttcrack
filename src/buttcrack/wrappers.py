@@ -31,13 +31,32 @@ from .text import only_letters
 #: Relative frequency of each letter in English, plus space, as a byte-level target.
 _ENGLISH_BYTE_FREQ = {
     ord(" "): 0.1800,
-    ord("e"): 0.1041, ord("t"): 0.0729, ord("a"): 0.0651, ord("o"): 0.0645,
-    ord("i"): 0.0602, ord("n"): 0.0575, ord("s"): 0.0537, ord("r"): 0.0498,
-    ord("h"): 0.0480, ord("l"): 0.0325, ord("d"): 0.0335, ord("c"): 0.0223,
-    ord("u"): 0.0227, ord("m"): 0.0203, ord("f"): 0.0197, ord("p"): 0.0161,
-    ord("g"): 0.0159, ord("w"): 0.0169, ord("y"): 0.0145, ord("b"): 0.0124,
-    ord("v"): 0.0082, ord("k"): 0.0056, ord("x"): 0.0014, ord("j"): 0.0010,
-    ord("q"): 0.0008, ord("z"): 0.0005,
+    ord("e"): 0.1041,
+    ord("t"): 0.0729,
+    ord("a"): 0.0651,
+    ord("o"): 0.0645,
+    ord("i"): 0.0602,
+    ord("n"): 0.0575,
+    ord("s"): 0.0537,
+    ord("r"): 0.0498,
+    ord("h"): 0.0480,
+    ord("l"): 0.0325,
+    ord("d"): 0.0335,
+    ord("c"): 0.0223,
+    ord("u"): 0.0227,
+    ord("m"): 0.0203,
+    ord("f"): 0.0197,
+    ord("p"): 0.0161,
+    ord("g"): 0.0159,
+    ord("w"): 0.0169,
+    ord("y"): 0.0145,
+    ord("b"): 0.0124,
+    ord("v"): 0.0082,
+    ord("k"): 0.0056,
+    ord("x"): 0.0014,
+    ord("j"): 0.0010,
+    ord("q"): 0.0008,
+    ord("z"): 0.0005,
 }
 
 
@@ -348,8 +367,14 @@ def from_keyboard_coordinates(text: str) -> str:
 # -- phone keypad --------------------------------------------------------------
 
 KEYPAD = {
-    "2": "ABC", "3": "DEF", "4": "GHI", "5": "JKL",
-    "6": "MNO", "7": "PQRS", "8": "TUV", "9": "WXYZ",
+    "2": "ABC",
+    "3": "DEF",
+    "4": "GHI",
+    "5": "JKL",
+    "6": "MNO",
+    "7": "PQRS",
+    "8": "TUV",
+    "9": "WXYZ",
 }
 _KEYPAD_INDEX = {
     ch: (digit, i + 1) for digit, group in KEYPAD.items() for i, ch in enumerate(group)

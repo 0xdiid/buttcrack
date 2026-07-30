@@ -134,9 +134,7 @@ class M94(Cipher):
                 decoded = [
                     [_decode_column(col, disks[d], back) for d in range(25)] for col in columns
                 ]
-                weights = [
-                    [_monogram_fit(decoded[c][d]) for d in range(25)] for c in range(width)
-                ]
+                weights = [[_monogram_fit(decoded[c][d]) for d in range(25)] for c in range(width)]
                 _, assignment = hungarian_max(weights)
                 assignment = _climb(assignment, decoded, letters, width, scorer, deadline)
                 plain = _reassemble(decoded, assignment, len(letters), width)

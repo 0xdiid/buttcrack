@@ -34,7 +34,6 @@ from __future__ import annotations
 
 import time
 
-
 from ..result import Candidate
 from ..scoring import NgramScorer
 from ..text import only_letters
