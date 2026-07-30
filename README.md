@@ -3,7 +3,7 @@
 ![CI](https://github.com/0xdiid/buttcrack/actions/workflows/ci.yml/badge.svg)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![License: MIT](https://img.shields.io/badge/license-MIT-green)
-![Ciphers](https://img.shields.io/badge/ciphers-64%2F64-brightgreen)
+![Ciphers](https://img.shields.io/badge/ciphers-78-brightgreen)
 
 A command-line classical-cipher cracker that **AI agents can drive easily** — the
 agent-friendly cousin of [CryptoCrack](https://sites.google.com/site/cryptocrackprogram/home).
@@ -17,8 +17,12 @@ results out — recovered key, plaintext, fitness score, calibrated confidence, 
 ranked alternatives.
 
 > Status: all 64 CryptoCrack cipher types are implemented and validated against
-> published vectors; the engine, scoring, and agent contract are stable. Still
-> pre-1.0.
+> published vectors, plus 14 more closing the gaps against dCode and CrypTool 2
+> (78 total) — including Enigma M3, the M-94 Jefferson cylinder and Chaocipher.
+> The engine, scoring, and agent contract are stable. Still pre-1.0.
+>
+> See [`docs/gap-analysis.md`](docs/gap-analysis.md) for the capability audit against
+> dCode and CrypTool 2, including what is deliberately *not* implemented and why.
 
 ## Install
 

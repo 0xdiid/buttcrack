@@ -6,6 +6,87 @@ and not yet published, so changes are grouped by milestone rather than release.
 
 ## Unreleased
 
+### Added — coverage gaps closed against dCode and CrypTool 2
+
+A capability audit against [dCode](https://www.dcode.fr/tools-list#cryptography) and
+[CrypTool 2](https://github.com/CrypToolProject/CrypTool-2) (`docs/gap-analysis.md`)
+found four real holes and one CLI-surface gap. All five are closed. Every cipher below
+is validated against a published vector before its cracker is trusted, and every
+cracker is plant-gated on settings it planted itself.
+
+- **Six new cipher types** (72 -> 78), all reachable from
+  `encode`/`decode`/`crack`/`auto`:
+  - **`polybius`** — the plain 5x5 coordinate cipher. It existed *inside* 22 files as
+    `PolybiusSquare` but was not a registry entry, so `butt encode polybius` did not
+    work. `crack` solves it outright: each coordinate pair stands for one plaintext
+    letter, so relabelling the pairs turns it into the monoalphabetic problem the
+    substitution solver already handles — no keyword search, and the square is read off
+    the solved map.
+  - **`collon`** — the last missing member of the 5x5 grid family. The obvious attack
+    (anneal the 25-cell square) is the wrong one: the ciphertext can only ever contain
+    ten distinct letters (five row labels, five column labels), which makes it another
+    monoalphabetic solve. Group size falls out of the same constraint. 5/5 on the plant
+    gate in 1.7s each, versus 0/5 for annealing in 45s.
+  - **`ubchi`** — WWI German double columnar reusing one key. The reuse is the
+    weakness: widths 2..8 are under 46000 orders total, so the permutation is
+    enumerated rather than searched.
+  - **`chaocipher`** — Byrne's two dynamic alphabets. `identify.py` already named it as
+    an unrecoverable-period failure mode but could not apply it. Matches Exhibit 1 of
+    the Byrne papers exactly. `crack` returns `[]` **by design**: one wrong cell
+    corrupts the whole remaining decrypt, so a nearly-correct key scores like a random
+    one and there is no gradient to climb.
+  - **`m94`** (aliases `cylinder`, `jefferson`, `m138`) — the Jefferson cylinder, with
+    the documented 25-disk table (disk 17 begins `ARMYOFTHEUS`). The disk order is a
+    permutation of 25 — 15.5 septillion — but positions `j` and `j + width` share a
+    disk, making "which disk sits where" a bipartite **assignment** solved exactly by
+    Hungarian, then refined by a pairwise-swap n-gram climb. Recovers a full 25-disk
+    order from 228 letters (9 per column) in under a second.
+  - **`enigma`** (M3, rotors I-VIII, reflectors B/C, rings, plugboard) — matches the
+    `AAAAA -> BDZGO` vector and the canonical 26-letter output. `crack` is Gillogly's
+    three phases: positions by IoC, rings by n-gram, then a greedy plugboard that needs
+    no crib. A full 60-rotor-order sweep runs in ~2.5 minutes at ~16000 trial
+    decrypts/sec. `ring_sweep=True` adds the right-hand ring to phase 1 (26x cost),
+    needed only when the rotor order *and* a non-trivial ring are both unknown.
+- **`buttcrack.wrappers`** — the transport layer a puzzle wraps *around* its cipher,
+  wired into `butt transform`. Repeating-key **XOR** with key-length recovery,
+  base32/base85/base-N (2..62), ROT47/ROT5/ROT18, keyboard shift and coordinates, phone
+  multi-tap and T9, tap code, NATO, Braille, and a generic `Transcriptor` that covers
+  any symbol alphabet from a supplied table. New flags: `transform --xor`, `--apply`,
+  `--wrap`, `--transcribe`, `--list-wrappers`.
+- **`stats --autocorrelation` and `stats --friedman`** — both computations already
+  existed in `analysis`/`diagnose`/`compare` but neither was reachable from the CLI,
+  and neither was gated. Now both report a verdict rather than a bare number.
+
+### Fixed / hardened by the above
+
+- **Autocorrelation cannot invent a period from flat text.** Scoring each lag against
+  the 1/26 random floor makes *every* lag significant for monoalphabetic or transposed
+  text (which coincides at plaintext rate throughout), so a harmonic search always found
+  something. Now gated on IoC and reported as a refusal. 4/4 false positives removed.
+- **The kappa test is ranked by harmonic family, not by the fundamental lag.** English
+  is anti-correlated at distance 2-3, so a true period-2 key reads z<0 at lag 2 while
+  lags 4, 6, 8 spike — judging a period by its own lag rejects exactly the short periods
+  it should find. Plant gate went 3/12 -> 18/19.
+- **Period ambiguity is reported, not hidden.** A key that repeats a letter `d` apart
+  (SECRET has E at 1 and 4) makes lag `d` genuinely coincide, so period 3 outranks the
+  true 6 on its own merit. `candidate_periods` reports the whole ladder instead of one
+  confidently wrong number.
+- **XOR key length is chosen by a penalised score.** Every extra key byte is a free
+  parameter that can repaint one position per period, so raw fitness rises monotonically
+  with key length and the winner is always `max_keysize`. Ranking now uses quadgram
+  fitness with an explicit length penalty, and collapses periodic keys onto their period.
+- **Letters-in/letters-out wrappers must read as English to be reported.** Keyboard
+  shift always produces plausible-looking letters, so the detection pass returned two
+  confident non-answers for every plain A-Z ciphertext.
+
+### Known gaps, stated rather than approximated
+
+ROT8000 (version-specific validity table), the PGP word list, the periodic-table cipher
+(`SNO` segments as S+N+O or Sn+O), DTMF, semaphore and pigpen are **not** implemented;
+`Transcriptor` covers them given a table. Enigma and Chaocipher are excluded from `auto`
+(`auto_crackable = False`) because their searches take minutes, not the seconds `auto`
+budgets per cipher.
+
 ### Added — methodology instruments generalized from the campaign scripts and allied solvers’ tooling
 
 A second consolidation sweep, this time over the *methodology* (not cipher mechanics)

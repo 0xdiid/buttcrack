@@ -19,11 +19,27 @@ ROUND_TRIP_KEYS = {
     "railfence": "4",
     "columnar": "ZEBRA",
     "substitution": "QWERTYUIOPASDFGHJKLZXCVBNM",
+    # Grid and machine ciphers: like transposition, these work on a clean stream.
+    "polybius": "KRYPTOS",
+    "collon": "KRYPTOS/5",
+    "ubchi": "UBER/1",
+    "chaocipher": "HXUCZVAMDSLKPEFJRIGTWOBNYQ/PTLNBQDEOYSFAVZKGJRIHWXUMC",
+    "m94": "17,4,9,22,1/6",
+    "enigma": "I II III/B/AAA/AAA/AB CD",
 }
 
 # Transposition reorders letters and cannot preserve spacing/case, so it only
 # round-trips the letter stream; substitution-class ciphers preserve layout.
-TRANSPOSITION = {"railfence", "columnar"}
+TRANSPOSITION = {"railfence", "columnar", "ubchi"}
+
+# Everything that round-trips only the letter stream. Wider than TRANSPOSITION: a
+# grid cipher (Polybius, Collon) or a machine (Chaocipher, M-94, Enigma) also consumes
+# a clean stream and cannot give the layout back.
+LETTER_STREAM = TRANSPOSITION | {"polybius", "collon", "chaocipher", "m94", "enigma"}
+
+# Polybius emits digit pairs rather than letters, so it is checked for the same
+# spacing leak by a different assertion.
+DIGIT_OUTPUT = {"polybius"}
 
 SAMPLE = "Meet me at the old bridge at dawn, bring the map!"
 
@@ -32,18 +48,32 @@ SAMPLE = "Meet me at the old bridge at dawn, bring the map!"
 def test_round_trip(name, key):
     cipher = registry.get(name)
     decoded = cipher.decode(cipher.encode(SAMPLE, key), key)
-    if name in TRANSPOSITION:
+    if name in LETTER_STREAM:
         assert only_letters(decoded) == only_letters(SAMPLE)
     else:
         assert decoded == SAMPLE
 
 
-@pytest.mark.parametrize("name", sorted(TRANSPOSITION))
+@pytest.mark.parametrize("name", sorted(LETTER_STREAM - DIGIT_OUTPUT))
 def test_transposition_encode_does_not_leak_word_lengths(name):
     cipher = registry.get(name)
     key = ROUND_TRIP_KEYS[name]
     out = cipher.encode("attack the bridge at noon today", key)
     assert out.isalpha() and out.isupper()  # clean letter stream, no spacing leak
+
+
+@pytest.mark.parametrize("name", sorted(DIGIT_OUTPUT))
+def test_digit_output_encode_does_not_leak_word_lengths(name):
+    """Same gate for the coordinate ciphers: one fixed-size group per letter.
+
+    Their output is spaced, so ``isalpha`` cannot express the property. What matters is
+    that the spacing is a uniform per-letter grouping and not the plaintext's words —
+    so the group count must equal the letter count, with every group the same width.
+    """
+    plaintext = "attack the bridge at noon today"
+    groups = registry.get(name).encode(plaintext, ROUND_TRIP_KEYS[name]).split()
+    assert len(groups) == len(only_letters(plaintext))
+    assert len({len(g) for g in groups}) == 1
 
 
 def test_aliases_resolve_to_same_instance():

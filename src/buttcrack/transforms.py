@@ -86,8 +86,25 @@ def detect_encoding(raw: str) -> list[dict]:
 
 
 def candidates(raw: str) -> list[dict]:
-    """All pre-flight transform candidates for ``raw`` (for ``butt transform``)."""
+    """All pre-flight transform candidates for ``raw`` (for ``butt transform``).
+
+    The three original un-wraps plus the wider transport layer in
+    :mod:`buttcrack.wrappers` — base32/85, ROT47, keyboard geometry, phone keypad, tap
+    code, NATO, Braille. Every one of those is gated on a signal a letter cipher would
+    not carry, so a plain A-Z ciphertext still returns only ``reverse``.
+    """
+    from . import wrappers
+
     out: list[dict] = [{"kind": "reverse", "text": reverse(raw)}]
     for enc in detect_encoding(raw):
         out.append({"kind": enc["kind"], "text": enc["decoded"]})
+    seen = {c["text"] for c in out}
+    for hit in wrappers.detect(raw):
+        if hit["text"] in seen:
+            continue
+        seen.add(hit["text"])
+        entry = {"kind": hit["kind"], "text": hit["text"]}
+        if hit.get("note"):
+            entry["note"] = hit["note"]
+        out.append(entry)
     return out

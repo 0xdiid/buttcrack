@@ -14,13 +14,16 @@ from .bazeries import Bazeries
 from .beaufort import Beaufort
 from .bifid import Bifid
 from .cadenus import Cadenus
+from .chaocipher import Chaocipher
 from .caesar import Caesar, Rot13
 from .checkerboard import Checkerboard
 from .cm_bifid import CMBifid
+from .collon import Collon
 from .columnar import Columnar
 from .compressocrat import Compressocrat
 from .condi import Condi
 from .digrafid import Digrafid
+from .enigma import Enigma
 from .four_square import FourSquare
 from .fractionated_morse import FractionatedMorse
 from .grandpre import Grandpre
@@ -37,6 +40,7 @@ from .key_phrase import KeyPhrase
 from .keystream import LcgKeystream, LinearRecurrenceKeystream
 from .monome_dinome import MonomeDinome
 from .morbit import Morbit
+from .m94 import M94
 from .myszkowski import Myszkowski
 from .nicodemus import Nicodemus
 from .nihilist_substitution import NihilistSubstitution
@@ -47,6 +51,7 @@ from .periodic_gromark import PeriodicGromark
 from .phillips import Phillips
 from .playfair import Playfair
 from .pollux import Pollux
+from .polybius import Polybius
 from .porta import Porta
 from .portax import Portax
 from .progressive_key import ProgressiveKey
@@ -71,6 +76,7 @@ from .tri_square import TriSquare
 from .tridigital import Tridigital
 from .trifid import Trifid
 from .two_square import TwoSquare
+from .ubchi import Ubchi
 from .variant_beaufort import VariantBeaufort
 from .vigenere import Vigenere
 
@@ -116,6 +122,8 @@ ALL_CIPHERS: tuple[type[Cipher], ...] = (
     Checkerboard,
     MonomeDinome,
     Digrafid,
+    Polybius,
+    Collon,
     Phillips,
     Compressocrat,
     Syllabary,
@@ -132,6 +140,7 @@ ALL_CIPHERS: tuple[type[Cipher], ...] = (
     Amsco,
     Route,
     Redefence,
+    Ubchi,
     NihilistTransposition,
     Nicodemus,
     Cadenus,
@@ -140,6 +149,9 @@ ALL_CIPHERS: tuple[type[Cipher], ...] = (
     SequenceTransposition,
     Hill,
     Bazeries,
+    M94,
+    Chaocipher,
+    Enigma,
     Gromark,
     PeriodicGromark,
     LinearRecurrenceKeystream,

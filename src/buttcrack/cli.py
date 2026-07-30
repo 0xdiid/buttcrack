@@ -980,10 +980,38 @@ def _cmd_pipeline(args) -> int:
 
 
 def _cmd_transform(args) -> int:
-    from . import transforms
+    from . import transforms, wrappers
 
+    # Checked before reading input: listing the names must not require any.
+    if getattr(args, "list_wrappers", False):
+        kinds = wrappers.wrapper_kinds()
+        if args.json or args.compact:
+            print(json.dumps({"ok": True, "operation": "transform", "wrappers": kinds}))
+        else:
+            print("\n".join(kinds))
+        return 0
     text = _resolve_text(args)
-    if getattr(args, "decimate", None):
+    if getattr(args, "xor", False):
+        hits = wrappers.detect_xor(text, max_keysize=getattr(args, "max_keysize", 40))
+        cands = [
+            {
+                "kind": f"xor key={h['key_repr']!r} ({h['keysize']} bytes)",
+                "text": h["plaintext"],
+                "key": h["key_repr"],
+                "keysize": h["keysize"],
+                "score": h["score"],
+                "printable": h["printable"],
+            }
+            for h in hits
+        ]
+    elif getattr(args, "transcribe", None):
+        table = wrappers.Transcriptor.from_pairs(args.transcribe)
+        cands = [{"kind": "transcribe", "text": table.decode(text)}]
+    elif getattr(args, "apply", None) or getattr(args, "wrap", None):
+        kind = args.apply or args.wrap
+        out_text = wrappers.apply_wrapper(kind, text, encode=bool(args.wrap))
+        cands = [{"kind": f"{'wrap' if args.wrap else 'peel'} {kind}", "text": out_text}]
+    elif getattr(args, "decimate", None):
         period, _, offset = args.decimate.partition(":")
         out_text = transforms.decimate(text, int(period), int(offset or 0))
         cands = [{"kind": f"decimate {args.decimate}", "text": out_text}]
@@ -1296,6 +1324,14 @@ def _cmd_stats(args) -> int:
             )
             for stat in ("coset_ioc", "kappa")
         }
+    if getattr(args, "autocorrelation", None):
+        info["autocorrelation"] = analysis.autocorrelation_report(
+            text, max_lag=args.autocorrelation
+        )
+    if getattr(args, "friedman", False):
+        info["friedman"] = analysis.friedman_test(
+            text, kappa_p=getattr(args, "kappa_plain", 0.0667)
+        )
     if args.json:
         indent = None if getattr(args, "compact", False) else 2
         print(json.dumps(info, ensure_ascii=False, indent=indent))
@@ -1349,6 +1385,34 @@ def _cmd_stats(args) -> int:
         if info.get("contacts"):
             hi = "  ".join(f"{c['letter']}={c['variety']}" for c in info["contacts"][:8])
             print(f"contact variety (high=vowel-like): {hi}")
+        fried = info.get("friedman") or {}
+        if fried:
+            est = fried["estimate"]
+            flag = "" if fried["reliable"] else "  [UNRELIABLE]"
+            shown = est if est is not None else "undefined"
+            print(f"friedman: key length ~{shown}  (IoC={fried['ioc']}, n={fried['n']}){flag}")
+            print(f"  {fried['note']}")
+        auto = info.get("autocorrelation") or {}
+        if auto:
+            top = "  ".join(f"{r['lag']}(z{r['z']})" for r in auto["top"][:6])
+            print(f"autocorrelation top lags (max_lag={auto['max_lag']}): {top}")
+            fams = auto["harmonic_families"][:4]
+            if fams:
+                shown = "  ".join(
+                    f"p={f['period']}(family z{f['family_z']})"
+                    for f in fams
+                )
+                print(f"  harmonic families: {shown}")
+            if auto["best_period"]:
+                print(f"  -> {auto['verdict']}: {auto['best_period']}")
+                also = auto["multiples_also_significant"]
+                if also:
+                    print(
+                        f"     key length may be any of {auto['candidate_periods']} — a key that "
+                        "repeats a letter internally makes the gap look like the period"
+                    )
+            else:
+                print(f"  -> {auto['verdict']}")
         if info.get("period_significance"):
             print("period significance (z vs matched null; * = small-sample/unreliable):")
             for p, d in sorted(info["period_significance"].items(), key=lambda kv: int(kv[0])):
@@ -2022,12 +2086,36 @@ def build_parser() -> argparse.ArgumentParser:
     add_io(p)
     p.set_defaults(func=_cmd_pipeline)
 
-    # transform (pre-flight un-wraps: reverse / nested-encoding peel / decimate)
-    p = sub.add_parser("transform", help="undo format wrappers (reverse, base64/hex/A1Z26, nulls)")
+    # transform (pre-flight un-wraps: reverse / nested-encoding peel / decimate / wrappers)
+    p = sub.add_parser(
+        "transform",
+        help="undo transport wrappers (reverse, base64/32/85, hex, A1Z26, ROT47, XOR, "
+        "keyboard, keypad, tap code, NATO, Braille, nulls)",
+    )
     add_io(p)
     p.add_argument(
         "--decimate", metavar="PERIOD[:OFFSET]", help="drop every PERIOD-th letter at OFFSET"
     )
+    p.add_argument(
+        "--xor",
+        action="store_true",
+        help="recover a repeating-key XOR without being told the key length (input read "
+        "as hex or base64 bytes when it looks like either, otherwise as UTF-8)",
+    )
+    p.add_argument(
+        "--max-keysize", type=int, default=40, help="longest XOR key to try (default 40)"
+    )
+    p.add_argument(
+        "--apply", metavar="KIND", help="peel one named wrapper (see --list-wrappers)"
+    )
+    p.add_argument("--wrap", metavar="KIND", help="apply one named wrapper (the encode direction)")
+    p.add_argument(
+        "--transcribe",
+        metavar="SPEC",
+        help="decode a custom symbol alphabet given as 'A=glyph,B=glyph,...' — the "
+        "generic form of the novelty-script tables",
+    )
+    p.add_argument("--list-wrappers", action="store_true", help="list --apply/--wrap names")
     p.set_defaults(func=_cmd_transform)
 
     # crib (crib-drag + crib-anchored solvers: Vigenere family, keyed, autokey, product)
@@ -2120,6 +2208,29 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=200,
         help="shuffles for the --family null (default 200)",
+    )
+    p.add_argument(
+        "--autocorrelation",
+        nargs="?",
+        type=int,
+        const=32,
+        metavar="MAX_LAG",
+        help="full kappa autocorrelation table by lag (default max lag 32) plus the "
+        "harmonic-family read — a period shows as spikes at p, 2p, 3p...; a lone tall "
+        "lag is usually a repeated phrase, not a keystream",
+    )
+    p.add_argument(
+        "--friedman",
+        action="store_true",
+        help="Friedman kappa key-length estimate with its reliability verdict (the bare "
+        "scalar is undefined for monoalphabetic/transposition and noisy under 200 letters)",
+    )
+    p.add_argument(
+        "--kappa-plain",
+        type=float,
+        default=0.0667,
+        metavar="IOC",
+        help="plaintext-language IoC for --friedman (default 0.0667 = English)",
     )
     add_io(p)
     p.set_defaults(func=_cmd_stats)

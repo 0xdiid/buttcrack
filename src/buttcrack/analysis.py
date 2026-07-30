@@ -2193,6 +2193,219 @@ def friedman_period_estimate(letters, *, kappa_p=0.0667, kappa_r=1 / 26):
     return round((kappa_p - kappa_r) / denom, 2) if denom > 1e-6 else None
 
 
+#: Above this IoC the text reads monoalphabetic (or transposed) rather than
+#: polyalphabetic, and both period estimators below become undefined. Matches the
+#: gate ``analyze`` applies before its calibrated period scans.
+POLYALPHABETIC_IOC_MAX = 0.058
+
+
+def friedman_test(letters, *, kappa_p: float = 0.0667, kappa_r: float = 1 / 26) -> dict:
+    """Friedman's kappa test, reported with the caveats the bare scalar hides.
+
+    :func:`friedman_period_estimate` returns one number and ``None`` everywhere it
+    is undefined, which reads the same as "no period" when it actually means "this
+    estimator does not apply here". This wraps it with the inputs (``ioc``, the two
+    reference kappas) and an explicit ``reliable`` verdict, because the closed form
+    ``(kp - kr) / (IC - kr)`` degenerates in two directions:
+
+    * ``IC >= kp`` — monoalphabetic or a transposition. The estimate collapses toward
+      1 and below, which is not a key length; it means "no polyalphabetic period".
+    * ``IC <= kr`` — at or below the random floor. The denominator vanishes and the
+      estimate is unbounded (returned as ``None``).
+
+    ``kappa_p`` defaults to English (0.0667); pass the plaintext language's IoC when
+    the payload is not English or the estimate is biased by a fixed factor.
+    """
+    letters = only_letters(letters)
+    n = len(letters)
+    if n < 20:
+        return {
+            "n": n,
+            "ioc": None,
+            "kappa_plain": kappa_p,
+            "kappa_random": round(kappa_r, 5),
+            "estimate": None,
+            "reliable": False,
+            "note": "text too short for a Friedman estimate (need 20+ letters)",
+        }
+    ioc = index_of_coincidence(letters)
+    denom = ioc - kappa_r
+    estimate = round((kappa_p - kappa_r) / denom, 2) if denom > 1e-6 else None
+    if estimate is None:
+        note = "IoC at or below the random floor — estimator undefined (flat/fractionated text)"
+        reliable = False
+    elif ioc >= POLYALPHABETIC_IOC_MAX:
+        # Not ``ioc >= kappa_p``: real monoalphabetic English lands anywhere in
+        # ~0.060-0.070, comfortably under the 0.0667 nominal, so keying off the nominal
+        # lets ordinary Caesar text through with a spurious "key length 1.2".
+        note = (
+            f"IoC {ioc:.4f} is at monoalphabetic level — a Caesar, a simple substitution "
+            "or a transposition, not a polyalphabetic period"
+        )
+        reliable = False
+    else:
+        # The estimate is a ratio of two small differences; its sampling error grows
+        # fast as the text shortens. Below ~200 letters treat it as an order of
+        # magnitude, not a key length.
+        reliable = n >= 200
+        note = (
+            "coarse scalar — confirm the integer period against the calibrated scans"
+            if reliable
+            else "under 200 letters the ratio is noise-dominated; treat as an order of magnitude"
+        )
+    return {
+        "n": n,
+        "ioc": round(ioc, 5),
+        "kappa_plain": kappa_p,
+        "kappa_random": round(kappa_r, 5),
+        "estimate": estimate,
+        "reliable": reliable,
+        "note": note,
+    }
+
+
+def autocorrelation_report(letters, *, max_lag: int = 32) -> dict:
+    """The full kappa autocorrelation table, plus the harmonic read of it.
+
+    :func:`kappa_spectrum` returns lags ranked by ``z`` and ``analyze`` keeps only the
+    top 6, which is the wrong shape for reading a period off the text: a period ``p``
+    shows up as a *family* of spikes at ``p, 2p, 3p, ...``, and a single tall lag with
+    no harmonics is usually a repeated phrase rather than a keystream.
+
+    Returns the table ordered by ``lag`` (not by ``z``), the top rows by ``z``, and
+    ``harmonic_families`` — for each candidate period, the mean ``z`` over its own
+    multiples plus its ``contrast`` against the lags that are *not* its multiples.
+
+    The verdict deliberately does **not** require every harmonic to be significant.
+    Overlap shrinks with lag (``n - lag`` pairs), so on a 400-letter period-7 text the
+    fundamental reads z~4 while lag 21 reads z~0.3 — a floor rule on the weakest
+    harmonic rejects the true period. What separates a keystream from a repeated
+    phrase is the *fundamental* clearing significance while the family as a whole sits
+    above the background, so that is what is tested.
+    """
+    letters = only_letters(letters)
+    spectrum = kappa_spectrum(letters, max_lag=max_lag)
+    by_lag = sorted(spectrum, key=lambda r: r["lag"])
+    n_lags = len(by_lag)
+    if n_lags < 4:
+        return {
+            "max_lag": max_lag,
+            "by_lag": by_lag,
+            "top": [],
+            "harmonic_families": [],
+            "verdict": "text too short for an autocorrelation read",
+            "best_period": None,
+            "multiples_also_significant": [],
+            "candidate_periods": [],
+        }
+
+    # The kappa test only answers the period question for POLYALPHABETIC text. On
+    # monoalphabetic or transposed text every lag coincides at plaintext rate (IoC
+    # ~0.066), so every lag is "significant" against the 1/26 random floor and the
+    # harmonic search will manufacture a period out of noise. Refuse the read instead
+    # — same gate ``analyze`` applies before its calibrated period scans.
+    ioc = index_of_coincidence(letters) if len(letters) >= 2 else 0.0
+    if ioc >= POLYALPHABETIC_IOC_MAX:
+        return {
+            "max_lag": max_lag,
+            "by_lag": by_lag,
+            "top": sorted(by_lag, key=lambda r: r["z"], reverse=True)[:8],
+            "harmonic_families": [],
+            "verdict": (
+                f"monoalphabetic or transposition (IoC {ioc:.4f}) — every lag coincides "
+                "at plaintext rate, so autocorrelation cannot resolve a period"
+            ),
+            "best_period": None,
+            "multiples_also_significant": [],
+            "candidate_periods": [],
+        }
+
+    z_at = {r["lag"]: r["z"] for r in by_lag}
+
+    families: list[dict] = []
+    # A period needs at least two visible harmonics to be a family rather than a spike.
+    for period in range(2, n_lags // 2 + 1):
+        multiples = [lag for lag in range(period, n_lags + 1, period)]
+        if len(multiples) < 2:
+            continue
+        inside = [z_at[lag] for lag in multiples]
+        outside = [z for lag, z in z_at.items() if lag % period]
+        if not outside:
+            continue
+        mean_in = sum(inside) / len(inside)
+        mean_out = sum(outside) / len(outside)
+        # Each per-lag z is ~unit variance under the null, so the difference of the two
+        # group means is a two-sample z with SE sqrt(1/k + 1/m).
+        se = (1 / len(inside) + 1 / len(outside)) ** 0.5
+        families.append(
+            {
+                "period": period,
+                "lags": multiples,
+                "fundamental_z": round(z_at[period], 2),
+                "mean_z": round(mean_in, 2),
+                "min_z": round(min(inside), 2),
+                # How far the whole family sits above the lags that are not its multiples.
+                "family_z": round((mean_in - mean_out) / se, 2),
+            }
+        )
+    # Rank by the FAMILY, not by the fundamental. The kappa test measures coincidence
+    # between positions the keystream realigns, and that only reaches the plaintext IoC
+    # once the two positions are far enough apart to be statistically independent —
+    # English is *anti*-correlated at distance 2-3 (vowels and consonants alternate), so
+    # a true period-2 key shows z<0 at lag 2 while lags 4, 6, 8... all spike. Judging a
+    # period by its own lag therefore rejects exactly the short periods it should find.
+    families.sort(key=lambda f: f["family_z"], reverse=True)
+
+    verdict, best_period = "no period", None
+    if families:
+        best = families[0]
+        # Every multiple of the true period p is also a family (its lags are a subset of
+        # p's), so 2p and 4p rank alongside p. Prefer the smallest divisor that holds up.
+        by_period = {f["period"]: f for f in families}
+        for d in range(2, best["period"]):
+            cand = by_period.get(d)
+            if best["period"] % d == 0 and cand and cand["family_z"] >= 0.7 * best["family_z"]:
+                best = cand
+                break
+        # ~max_lag/2 periods are tested, so the threshold carries a multiplicity margin.
+        if best["family_z"] >= 3.0:
+            verdict, best_period = "period", best["period"]
+        elif best["family_z"] >= 2.0:
+            verdict, best_period = "weak", best["period"]
+        elif max(r["z"] for r in by_lag) >= 3.0:
+            # Something is tall but it has no harmonic family behind it.
+            verdict = "spike without harmonics (repeated phrase, not a keystream)"
+
+    # The kappa test resolves the period only up to the key's OWN internal repeats. A
+    # key with the same letter at two positions d apart (SECRET: E at 1 and 4) makes
+    # lag d coincide for a fraction of positions, so d outranks the true length 6 on its
+    # own merit — no threshold separates them, because the period-3 signal is real.
+    # Report the multiples that also clear, so the caller sees the full ladder rather
+    # than a confidently wrong single number.
+    also = []
+    if best_period:
+        also = [
+            f["period"]
+            for f in families
+            if f["period"] != best_period
+            and f["period"] % best_period == 0
+            and f["family_z"] >= 2.0
+        ]
+
+    return {
+        "max_lag": max_lag,
+        "by_lag": by_lag,
+        "top": sorted(by_lag, key=lambda r: r["z"], reverse=True)[:8],
+        "harmonic_families": families[:8],
+        "verdict": verdict,
+        "best_period": best_period,
+        # Multiples of best_period that also clear; the true key length may be any of
+        # these when the key repeats a letter internally.
+        "multiples_also_significant": also,
+        "candidate_periods": ([best_period] + also) if best_period else [],
+    }
+
+
 def analyze(text: str, *, top_ngrams: int = 10, with_contacts: bool = False) -> dict:
     """Full statistical report for ``text`` (letters only)."""
     letters = only_letters(text)
