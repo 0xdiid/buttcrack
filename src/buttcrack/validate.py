@@ -381,6 +381,94 @@ def positive_control(
     }
 
 
+def _extract_plaintexts(result: Any, limit: int) -> list[str]:
+    """Up to ``limit`` candidate plaintexts from whatever an ``attack_fn`` returned."""
+    if isinstance(result, (list, tuple)):
+        return [only_letters(_extract_plaintext(r)) for r in result[:limit]]
+    single = only_letters(_extract_plaintext(result))
+    return [single] if single else []
+
+
+def control_battery(
+    attack_fn: Callable[[str], Any],
+    *,
+    sibling: dict[str, str] | None = None,
+    plant: dict[str, Any] | None = None,
+    top_n: int = 5,
+    span: int = 32,
+) -> dict[str, Any]:
+    """Grade an attack TRUSTED or VOID before any of its negatives enter the record.
+
+    Two tiers, either or both (at least one required):
+
+    * **Tier A — solved sibling.** ``sibling={"ciphertext", "plaintext"}`` is a case
+      whose answer is known (a previously solved puzzle, a published test vector).
+      The attack must reproduce a ``span``-letter run of the known plaintext within
+      its top ``top_n`` candidates. This catches harness rot end-to-end — wrong
+      input plumbing, broken scoring, a solver reading a file *path* instead of the
+      ciphertext and scoring heap garbage (all observed in practice).
+    * **Tier B — own plant at target length.** ``plant`` is a :func:`make_synthetic`
+      spec (``structure_spec`` + key fields, optional ``plaintext``/``length``).
+      The synthetic is built by THIS module's encoder — never by the attack under
+      test, because a self-consistently-wrong implementation will happily recover
+      its own mis-encoded plant. Recovery uses the :func:`positive_control` bar.
+
+    The verdict vocabulary is the point: an attack that fails either tier is
+    **VOID**, which is a different thing from its target result being negative —
+    a VOID attack's null carries no information and must not be cited as evidence.
+    Returns ``{"verdict": "TRUSTED"|"VOID", "tiers": [...]}``; feed a VOID straight
+    to :meth:`buttcrack.evidence.Finding.voided`.
+    """
+    if sibling is None and plant is None:
+        raise ValueError("provide a sibling case, a plant spec, or both")
+    tiers: list[dict[str, Any]] = []
+
+    if sibling is not None:
+        truth = only_letters(sibling["plaintext"])
+        need = truth[: min(span, len(truth))]
+        cands = _extract_plaintexts(attack_fn(sibling["ciphertext"]), top_n)
+        hit = next((i for i, c in enumerate(cands) if need and need in c), None)
+        tiers.append(
+            {
+                "tier": "A:solved-sibling",
+                "passed": hit is not None,
+                "detail": (
+                    f"known plaintext found at rank {hit + 1}/{len(cands)}"
+                    if hit is not None
+                    else f"known plaintext NOT in top {len(cands)} candidates"
+                ),
+            }
+        )
+
+    if plant is not None:
+        spec = dict(plant)
+        structure_spec = spec.pop("structure_spec", None) or {
+            "structure": spec.pop("structure")
+        }
+        pc = positive_control(
+            attack_fn,
+            structure_spec,
+            spec,
+            plaintext=spec.pop("plaintext", None),
+            length=spec.pop("length", None),
+        )
+        tiers.append(
+            {
+                "tier": "B:own-plant",
+                "passed": bool(pc["recovered"]),
+                "detail": (
+                    f"plant recovered (word_cov={pc['word_cov']})"
+                    if pc["recovered"]
+                    else f"plant NOT recovered (word_cov={pc['word_cov']}, "
+                    f"preview={pc['decode_preview'][:32]!r})"
+                ),
+            }
+        )
+
+    verdict = "TRUSTED" if all(t["passed"] for t in tiers) else "VOID"
+    return {"verdict": verdict, "tiers": tiers}
+
+
 def random_key(length: int, *, alphabet: str = "KRYPTOS", seed: int | None = None) -> str:
     """A random substitution key of ``length`` letters drawn from ``alphabet``.
 

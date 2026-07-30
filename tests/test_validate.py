@@ -11,6 +11,7 @@ from __future__ import annotations
 from buttcrack.ciphers.columnar import Columnar, _decode_letters, _read_order
 from buttcrack.layered import crack_quagmire_over_columnar
 from buttcrack.scoring import get_scorer
+from buttcrack import validate
 from buttcrack.validate import (
     STRUCTURES,
     SUBSTITUTIONS,
@@ -163,3 +164,67 @@ def test_random_key_is_deterministic_and_in_alphabet():
     k2 = random_key(12, alphabet="KRYPTOS", seed=7)
     assert k1 == k2 and len(k1) == 12
     assert set(k1) <= set("KRYPTOSABCDEFGHIJLMNQUVWXZ")
+
+
+# ------------------------------------------------------------ control battery
+
+def _good_attack(ct):
+    """A working attack for the substitution family used by the battery specs."""
+    from buttcrack.validate import decode_substitution
+
+    return [decode_substitution(ct, "PALIMPSEST", substitution="vigenere",
+                                alphabet="KRYPTOS")]
+
+
+def _broken_attack(ct):
+    """The observed failure mode: confident output unrelated to the input."""
+    return ["X" * len(ct)]
+
+
+def _battery_spec():
+    from buttcrack.validate import encode_substitution
+
+    pt = validate._FILLER[:200]
+    ct = encode_substitution(pt, "PALIMPSEST", substitution="vigenere",
+                             alphabet="KRYPTOS")
+    sibling = {"ciphertext": ct, "plaintext": pt}
+    plant = {
+        "structure_spec": {"structure": "substitution"},
+        "substitution": "vigenere",
+        "alphabet": "KRYPTOS",
+        "sub_key": "PALIMPSEST",
+        "length": 200,
+    }
+    return sibling, plant
+
+
+def test_control_battery_trusts_a_working_attack():
+    sibling, plant = _battery_spec()
+    res = validate.control_battery(_good_attack, sibling=sibling, plant=plant)
+    assert res["verdict"] == "TRUSTED"
+    assert all(t["passed"] for t in res["tiers"])
+    assert len(res["tiers"]) == 2
+
+
+def test_control_battery_voids_a_broken_attack():
+    sibling, plant = _battery_spec()
+    res = validate.control_battery(_broken_attack, sibling=sibling, plant=plant)
+    assert res["verdict"] == "VOID"
+    assert not any(t["passed"] for t in res["tiers"])
+
+
+def test_control_battery_requires_at_least_one_tier():
+    import pytest
+
+    with pytest.raises(ValueError):
+        validate.control_battery(_good_attack)
+
+
+def test_void_feeds_the_evidence_module():
+    from buttcrack.evidence import Finding
+
+    sibling, _ = _battery_spec()
+    res = validate.control_battery(_broken_attack, sibling=sibling)
+    assert res["verdict"] == "VOID"
+    f = Finding("no key found in 20k cells").voided(res["tiers"][0]["detail"])
+    assert f.verdict() == "void"
