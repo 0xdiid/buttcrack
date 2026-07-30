@@ -916,5 +916,27 @@
       }
     ],
     "crack_approach": "Classic monoalphabetic solve: frequency analysis (single letters, then bigrams/trigrams), pattern words (for Aristocrats with word breaks) against a dictionary, or automated hill-climbing / simulated-annealing on the 26-letter key with quadgram log-probability fitness (works for Patristocrats with no spaces). After recovering the substitution, detect the key type (K1-K4) by testing whether plaintext and/or ciphertext alphabets form keyed-keyword sequences, and recover the keyword(s)."
+  },
+  {
+    "name": "Josse",
+    "category": "polyalphabetic (ciphertext autokey)",
+    "algorithm": "Ciphertext-autokey over a KEYED MIXED alphabet (Maj. H. D. Josse, French Army, ~1889; spec recovered by Geraud-Stewart & Naccache, Cryptologia 45(4) 2021). The keyword builds a keyed alphabet which is written row-wise into a table and read back COLUMN-wise; a letter's number is its position in that mixed alphabet. With num()/let() that numbering and its inverse: C_1 = let(-num(P_1) mod n); C_i = let((num(P_i) + num(C_{i-1})) mod n). Decryption is therefore a first difference: P_1 = let(-num(C_1)); P_i = let((num(C_i) - num(C_{i-1})) mod n). Historical Josse omits W (n=25); the 26-letter generalisation is the default (drop=None).",
+    "key_format": "keyword[/table-width] (width defaults to the count of distinct keyword letters)",
+    "reciprocal": false,
+    "test_vectors": [
+      {
+        "plaintext": "WELLDONEISBETTERTHANWELLSAID",
+        "key": "CHIEN",
+        "ciphertext": "IARALVZNHYHGXMKGXCAGIARAXNHM"
+      },
+      {
+        "plaintext": "ATTACKATDAWNFROMTHENORTHRIDGE",
+        "key": "LANTERN",
+        "ciphertext": "WZHISOXUPQPSHGUQVTCMNCOVUFLGD"
+      }
+    ],
+    "reciprocal_note": "Encrypt adds the previous CIPHERTEXT number; decrypt subtracts it. Not reciprocal.",
+    "crack_approach": "Two stages. At the CORRECT numbering the difference sequence D_i = num(C_i) - num(C_{i-1}) equals num(plaintext) exactly, i.e. D is a monoalphabetic image of the plaintext; stage 2 then solves D as an ordinary simple substitution. For stage 1 the practical attack is to sweep KEYWORDS (the numbering is keyword-derived, so the key space is dictionary-sized, not 26!) and score the resulting decode. Lasry (Cryptologia 47(1) 2023) reports a ciphertext-only break from ~75 letters.",
+    "notes": "MEASURED WARNING on objectives: free-alphabet search over 26! is overfit-undecidable at short lengths (~150 letters). Maximising unigram IoC(D) overfits (a wrong numbering reaches 2.32 vs a true 1.89); sorted-profile matching is too coarse; and even digraph IoC(D) -- which is mono-invariant and an EXCELLENT test (true 4.12 vs random 1.08+-0.23, z+13.3) -- is beaten by free search (9.42). Use it to TEST a candidate numbering, never to search for one; search the keyword space instead."
   }
 ]
