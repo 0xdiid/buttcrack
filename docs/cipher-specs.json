@@ -938,5 +938,131 @@
     "reciprocal_note": "Encrypt adds the previous CIPHERTEXT number; decrypt subtracts it. Not reciprocal.",
     "crack_approach": "Two stages. At the CORRECT numbering the difference sequence D_i = num(C_i) - num(C_{i-1}) equals num(plaintext) exactly, i.e. D is a monoalphabetic image of the plaintext; stage 2 then solves D as an ordinary simple substitution. For stage 1 the practical attack is to sweep KEYWORDS (the numbering is keyword-derived, so the key space is dictionary-sized, not 26!) and score the resulting decode. Lasry (Cryptologia 47(1) 2023) reports a ciphertext-only break from ~75 letters.",
     "notes": "MEASURED WARNING on objectives: free-alphabet search over 26! is overfit-undecidable at short lengths (~150 letters). Maximising unigram IoC(D) overfits (a wrong numbering reaches 2.32 vs a true 1.89); sorted-profile matching is too coarse; and even digraph IoC(D) -- which is mono-invariant and an EXCELLENT test (true 4.12 vs random 1.08+-0.23, z+13.3) -- is beaten by free search (9.42). Use it to TEST a candidate numbering, never to search for one; search the keyword space instead."
+  },
+  {
+    "name": "Polybius",
+    "category": "grid/substitution",
+    "algorithm": "A keyed mixed 5x5 square (25-letter alphabet, J merged into I). Each plaintext letter is replaced by its 1-indexed (row)(column) coordinate pair, row first. ENCRYPT: letter -> two digits in 1..5. DECRYPT: inverse lookup. No fractionation, transposition or additive is applied, so the cipher is a pure monoalphabetic substitution written in a two-digit alphabet.",
+    "key_format": "A keyword for the mixed square; an empty key gives the standard A-Z (J->I) square.",
+    "reciprocal": false,
+    "test_vectors": [
+      {
+        "plaintext": "D",
+        "key": "ZEBRAS",
+        "ciphertext": "23",
+        "source": "Wikipedia 'Polybius square' / dCode.fr Polybius cipher — ZEBRAS square places D at row 2, column 3"
+      },
+      {
+        "plaintext": "A",
+        "key": "",
+        "ciphertext": "11",
+        "source": "Standard A-Z (J->I) square: A is row 1, column 1"
+      },
+      {
+        "plaintext": "Z",
+        "key": "",
+        "ciphertext": "55",
+        "source": "Standard A-Z (J->I) square: Z is row 5, column 5"
+      }
+    ],
+    "crack_approach": "Solve outright rather than searching keywords. Each distinct coordinate pair stands for exactly one plaintext letter, so relabel the (row,col) pairs as proxy symbols and the problem IS the monoalphabetic substitution problem — hand it to a quadgram hill-climbing substitution solver. The square is then read off the solved map; cells whose pair never occurs in the ciphertext are unconstrained and stay unknown.",
+    "notes": "Ciphertext alphabet is restricted to the digits 1-5, which rules the cipher out immediately for any other input."
+  },
+  {
+    "name": "Collon",
+    "category": "grid/polygrammic",
+    "algorithm": "A keyed mixed 5x5 square (J->I) plus a group size N. Split the plaintext into groups of N. For each group emit the ROW LABEL of every letter, then the COLUMN LABEL of every letter. The row label of row r is the letter at (r,0); the column label of column c is the letter at (4,c). Ciphertext is therefore twice the plaintext length and written in letters, not digits. DECRYPT: split each 2N-character block into N row labels and N column labels, pair them positionally, and read the square at the intersection of the row containing L1 and the column containing L2 (any letter identifies its row or column, not only the canonical label). A short final group of m letters is emitted as 2m characters.",
+    "key_format": "'KEYWORD/N' — square keyword and group size; an empty keyword gives the standard square.",
+    "reciprocal": false,
+    "test_vectors": [
+      {
+        "plaintext": "DC",
+        "key": "/2",
+        "ciphertext": "AAYX",
+        "source": "dCode.fr Collon cipher — standard square, N=2: D is row A column Y, C is row A column X, so rows AA then columns YX"
+      },
+      {
+        "plaintext": "CKF",
+        "key": "/3",
+        "ciphertext": "AKKXZV",
+        "source": "dCode.fr Collon cipher — N=3, rows AKK and columns XZV pair to AX, KZ, KV"
+      }
+    ],
+    "crack_approach": "Do NOT anneal the 25-cell square (measured 0/5). Only five letters can appear in a row position and five in a column position, so the ciphertext alphabet is at most 10 and each (row label, column label) pair maps to exactly one plaintext letter — a monoalphabetic substitution over at most 25 pair-symbols, solved directly. The group size falls out of the same constraint: at the true N the row half and column half of each block each draw on only five letters, and a wrong N mixes them. The square is recovered only up to a permutation of rows and of columns, which costs nothing because a label travels with its row, so every consistent ordering decodes identically.",
+    "notes": "The 10-letter ciphertext alphabet is the cipher's signature and its undoing."
+  },
+  {
+    "name": "Ubchi",
+    "category": "transposition",
+    "algorithm": "Double columnar transposition REUSING one permutation key. (1) Columnar-transpose the plaintext under the keyword. (2) Append n null letters to the intermediate result. (3) Columnar-transpose that under the SAME keyword. DECRYPT: undo the outer transposition, drop the n trailing nulls, undo the inner one. Used by the German army in WWI.",
+    "key_format": "'KEYWORD' or 'KEYWORD/NULLS' (e.g. UBER/1); the permutation may also be given as an explicit 0-based read order such as '1,2,3,0/1'. NULLS defaults to 0.",
+    "reciprocal": false,
+    "test_vectors": [
+      {
+        "plaintext": "SECRET",
+        "key": "UBER/1",
+        "ciphertext": "TECXRES",
+        "source": "dCode.fr Ubchi cipher — UBER sorts to B,E,R,U giving read order 1,2,3,0; SECRET -> ETCRSE, padded to ETCRSEX, -> TECXRES"
+      }
+    ],
+    "crack_approach": "The key reuse is the weakness. A general double transposition needs two independent permutations (width 6 alone is 518400 pairs); reusing one collapses the search to w! per width, and widths 2..8 together are under 46000 orders — enumerable outright. Try each order against every plausible null count, since the count shifts the intermediate length and a wrong count decodes to garbage. Rank by n-gram fitness.",
+    "notes": "Distinguish from a general double transposition, which uses two different keys and is not enumerable this way."
+  },
+  {
+    "name": "Chaocipher",
+    "category": "polyalphabetic/dynamic",
+    "algorithm": "Two 26-letter alphabets, LEFT (ciphertext) and RIGHT (plaintext), both permuted after EVERY letter. To encipher: find the plaintext letter at index i of RIGHT; the ciphertext letter is LEFT[i]. Then permute LEFT — rotate so LEFT[i] sits at position 0 (zenith), remove the letter now at position 1 and re-insert it at position 13 (nadir), sliding positions 2..13 down one. Then permute RIGHT — rotate so RIGHT[i] sits at position 0, rotate one place further, remove the letter at position 2 and re-insert it at position 13. DECRYPT: find the ciphertext letter in LEFT, read RIGHT at the same index; the permutation step is identical so both directions stay in lockstep. Invented by John F. Byrne in 1918; algorithm disclosed 2010.",
+    "key_format": "'LEFT/RIGHT' — two 26-letter permutations of A-Z.",
+    "reciprocal": false,
+    "test_vectors": [
+      {
+        "plaintext": "WELLDONEISBETTERTHANWELLSAID",
+        "key": "HXUCZVAMDSLKPEFJRIGTWOBNYQ/PTLNBQDEOYSFAVZKGJRIHWXUMC",
+        "ciphertext": "OAHQHCNYNXTSZJRRHJBYHQKSOUJY",
+        "source": "Moshe Rubin, 'Chaocipher Revealed: The Algorithm' (2010), Exhibit 1 of the Byrne papers"
+      }
+    ],
+    "crack_approach": "No keyless attack exists and none should be attempted. The keyspace is two independent 26-letter permutations (~2^177) and it cannot be climbed: the alphabets permute after each letter, so one wrong cell corrupts the ENTIRE remaining decrypt rather than one position of it, and the n-gram score of a nearly correct key is indistinguishable from that of a random one — there is no gradient. Published cryptanalysis (Deavours and Kruh) is a known-plaintext attack needing roughly 50-100 aligned characters.",
+    "notes": "A repeated plaintext block does NOT give a repeated ciphertext block; no period is recoverable by any statistic."
+  },
+  {
+    "name": "M-94 (Jefferson cylinder)",
+    "category": "machine/polyalphabetic",
+    "algorithm": "Twenty-five disks on a spindle, each carrying the 26 letters in its own scrambled order. The ORDER of the disks is the key. The operator turns each disk until the plaintext letters read across one row (the generatrix), then copies off any other row; the offset between the two rows is the second half of the key. For disk d with alphabet A_d and plaintext letter p at position j: ciphertext = A_d[(A_d.index(p) + offset) % 26]. Messages longer than the disk count wrap, so positions j and j+width pass through the same disk. M-138 is the same machine built from sliding strips — a subset of a larger strip set in a chosen order — modelled by giving a shorter disk order. Fielded by the US Army 1922-1943.",
+    "key_format": "'ORDER/OFFSET' — comma-separated 1-based disk numbers and a row offset 1..25 (offset 0 is the identity). Any number of disks from 2 to 25.",
+    "reciprocal": false,
+    "test_vectors": [
+      {
+        "plaintext": "(disk table check)",
+        "key": "disk 17",
+        "ciphertext": "ARMYOFTHEUSZJXDPCWGQIBKLNV",
+        "source": "Wikipedia 'M-94 (cipher machine)' documents that the 17th disc begins 'ARMY OF THE US'; full 25-disk table from the CrypTool 2 CylinderCipher Cylinders_M94.txt"
+      }
+    ],
+    "crack_approach": "The order is a permutation of 25 disks (15511210043330985984000000 arrangements), so no brute force. But positions j and j+width share a disk, so the ciphertext splits into width independent columns and, for a fixed offset, each column decrypts under each disk in exactly one way. 'Which disk sits in which position' is therefore a maximum-weight bipartite ASSIGNMENT, solved exactly by Hungarian with per-cell weights from English monogram log-likelihood. Follow it with a pairwise-swap hill climb on the quadgram score of the whole reconstructed plaintext — swapping preserves the permutation, and that step supplies the cross-column context no per-column score can see. Recovers a full 25-disk order from ~228 letters (9 per column).",
+    "notes": "Each disk is identified by the letter following A on it, from 'B 1' to 'Z 25'."
+  },
+  {
+    "name": "Enigma (M3)",
+    "category": "machine/rotor",
+    "algorithm": "Three rotors chosen from I-VIII, a reflector (UKW-B or UKW-C), ring settings and a plugboard. A key press steps the rotors, then the current runs plugboard -> right rotor -> middle -> left -> reflector -> left -> middle -> right -> plugboard. Stepping includes the double-step anomaly: the middle rotor advances both when the right rotor passes its notch and, on the very next press, together with the left rotor when the middle rotor is itself on its notch. A rotor at position p with ring setting r applies shift = p - r, so forward(c) = (wiring[(c+shift)%26] - shift)%26 and backward(c) = (inverse[(c+shift)%26] - shift)%26. Turnover is read off the window letter, so a rotor is at its notch when its POSITION equals the notch letter, independent of the ring. Rotor notches: I=Q, II=E, III=V, IV=J, V=Z, VI/VII/VIII=Z and M.",
+    "key_format": "'ROTORS/REFLECTOR/RINGS/POSITIONS[/PLUGBOARD]' — e.g. 'I II III/B/AAA/AAA/AB CD EF'. Rotors listed left to right; rings and positions three letters each; plugboard is space-separated letter pairs.",
+    "reciprocal": true,
+    "test_vectors": [
+      {
+        "plaintext": "AAAAA",
+        "key": "I II III/B/AAA/AAA",
+        "ciphertext": "BDZGO",
+        "source": "Standard Enigma I verification vector (rotors I II III, reflector B, rings AAA, positions AAA, no plugboard)"
+      },
+      {
+        "plaintext": "AAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "key": "I II III/B/AAA/AAA",
+        "ciphertext": "BDZGOWCXLTKSBTMCDLPBMUQOFX",
+        "source": "Canonical 26-letter Enigma I output, exercising the first turnover cycle and the double-step anomaly"
+      }
+    ],
+    "crack_approach": "Gillogly's three phases. (1) Sweep every rotor order and all 17576 start positions with rings AAA and an empty plugboard, ranking by the decrypt's index of coincidence — this works despite wrong rings and plugboard because IoC is invariant under the plugboard (a fixed substitution) and a wrong ring only mis-times a turnover. IoC is a whole-message statistic: on a 350-letter plant the true setting ranks 1070th when only 120 letters are scored and 1st at full length, so do not truncate the probe. (2) Sweep the ring settings on the n-gram score, which does see the turnover error; a ring and its rotor position shift together, so the position must follow the ring. (3) Grow the plugboard greedily — try all 325 unused letter pairs, keep the one that most improves the n-gram score, repeat up to ten leads. When the rotor order AND a non-trivial ring setting are both unknown, the right-hand ring must also be swept in phase 1 (26x cost): a measured plant put the true setting 128720th of 1054560 by IoC otherwise.",
+    "notes": "The reflector makes the machine reciprocal (encrypt == decrypt) and guarantees no letter ever encrypts to itself — the two facts every attack rests on. Reflectors must be involutions."
   }
 ]
