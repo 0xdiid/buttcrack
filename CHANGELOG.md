@@ -6,6 +6,28 @@ and not yet published, so changes are grouped by milestone rather than release.
 
 ## Unreleased
 
+### Added — Josse cipher (new cipher type)
+
+**`josse`** — ciphertext-autokey over a keyed mixed alphabet (Maj. H. D. Josse, French
+Army, ~1889; spec recovered by Géraud-Stewart & Naccache, *Cryptologia* 45(4) 2021;
+broken ciphertext-only from ~75 letters by Lasry, *Cryptologia* 47(1) 2023). Absent from
+the ACA registry and from every hobbyist tool we could find, so it was a real gap.
+
+* `encode`/`decode` for both the 26-letter generalisation (default) and the historical
+  25-letter form (`drop="W"`).
+* Keyless `crack`: two-stage. At the correct numbering the first-difference sequence
+  `D_i = num(C_i) − num(C_{i−1})` *is* a monoalphabetic image of the plaintext, so
+  stage 2 reduces to a simple-substitution solve.
+* `Josse.digraph_ioc` — a mono-invariant statistic that identifies a candidate
+  numbering (on a ~150-letter sample: true 4.12 vs random 1.08 ± 0.23, z +13.3).
+* Docs: full spec + verified test vectors in `docs/cipher-specs.json`; 6 tests.
+
+⚠ **Recorded caveat, measured:** the free 26!-alphabet search is overfit-undecidable at
+short lengths (~150 letters). Maximising unigram IoC overfits (wrong numbering 2.32 vs true 1.89), sorted-profile
+matching is too coarse, and even digraph IoC — an excellent *test* — is beaten by free
+search (9.42 vs true 4.12). The practical attack sweeps the **keyword** space, which is
+dictionary-sized rather than 26!, and recovers planted keys exactly.
+
 ### Added (campaign-derived primitives lifted into the toolkit)
 A consolidation pass over the PK working directory and the community effort: several techniques
 were hand-rolled across dozens of throwaway scripts (and independently re-derived by multiple

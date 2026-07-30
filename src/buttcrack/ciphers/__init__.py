@@ -32,6 +32,7 @@ from .hill import Hill
 from .homophonic import Homophonic
 from .incomplete_columnar import IncompleteColumnar
 from .interrupted_key import InterruptedKey
+from .josse import Josse
 from .key_phrase import KeyPhrase
 from .keystream import LcgKeystream, LinearRecurrenceKeystream
 from .monome_dinome import MonomeDinome
@@ -146,6 +147,7 @@ ALL_CIPHERS: tuple[type[Cipher], ...] = (
     Ragbaby,
     Condi,
     Substitution,
+    Josse,
 )
 
 __all__ = [
