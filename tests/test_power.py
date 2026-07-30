@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import random
 
+import pytest
+
 from buttcrack import power
 from buttcrack.scoring import get_scorer
 from buttcrack.validate import _FILLER
@@ -103,3 +105,84 @@ def test_power_curve_records_recovery_rate():
     )
     assert curve[0].recover_rate == 0.0
     assert curve[-1].recover_rate == 1.0
+
+
+# ------------------------------------------------------- best-of-N null growth
+
+def test_expected_null_max_grows_like_sqrt_log():
+    import math
+    assert power.expected_null_max(0.0, 1.0, 1) == 0.0
+    z200 = power.expected_null_max(0.0, 1.0, 200)
+    z7000 = power.expected_null_max(0.0, 1.0, 7000)
+    assert z7000 > z200 > 3.0
+    assert z200 == pytest.approx(math.sqrt(2 * math.log(200)))
+
+
+def test_bank_scaling_detects_destroyed_power():
+    # A z=+3.6 signal clears a 200-candidate bank but not a 7000-candidate one.
+    r = power.bank_scaling(3.6, 200, 7000)
+    assert r.margin_before > 0
+    assert r.margin_after < 0
+    assert not r.survives
+    assert "DESTROYED" in r.summary()
+
+
+def test_bank_scaling_strong_signal_survives():
+    assert power.bank_scaling(8.0, 200, 7000).survives
+
+
+# --------------------------------------------- 2-sample vs 1-sample distinction
+
+def test_labeling_power_separable_and_labelable():
+    rng = random.Random(7)
+    sig = [10 + rng.gauss(0, 1) for _ in range(50)]
+    nul = [0 + rng.gauss(0, 1) for _ in range(50)]
+    lp = power.labeling_power(sig, nul)
+    assert lp.auc > 0.99
+    assert lp.heldout_accuracy > 0.95
+
+
+def test_labeling_power_separable_but_not_labelable():
+    # Population means differ (auc well above 0.5) but overlap swamps one draw.
+    rng = random.Random(7)
+    sig = [0.5 + rng.gauss(0, 1) for _ in range(200)]
+    nul = [0.0 + rng.gauss(0, 1) for _ in range(200)]
+    lp = power.labeling_power(sig, nul)
+    assert lp.auc > 0.55
+    assert lp.heldout_accuracy < 0.75  # far from certain on ONE sample
+
+
+# ------------------------------------------------------------- family power
+
+def test_family_power_separates_signal_family_from_noise_family():
+    from buttcrack.scoring import index_of_coincidence
+
+    english = ("THEQUICKBROWNFOXJUMPSOVERTHELAZYDOGWHILETHERIVERRUNSPASTTHEOLD"
+               "STONEBRIDGEANDTHECHILDRENPLAYALONGTHEGRASSYBANKSOFTHETOWN")
+
+    def gen_english(rng):
+        return english
+
+    def gen_random(rng):
+        return "".join(rng.choice("ABCDEFGHIJKLMNOPQRSTUVWXYZ") for _ in range(len(english)))
+
+    def shuffle_null(text, rng):
+        chars = list(text)
+        rng.shuffle(chars)
+        return "".join(chars)
+
+    def bigram_repeat(text):
+        # order-sensitive statistic: fraction of adjacent equal-letter-class pairs
+        from buttcrack.scoring import get_scorer
+        return get_scorer("bigrams").score(text)
+
+    res = power.family_power(
+        {"english": gen_english, "random": gen_random},
+        bigram_repeat,
+        shuffle_null,
+        plants=5,
+        trials=40,
+        rng=random.Random(3),
+    )
+    assert res["english"]["power"] == 1.0
+    assert res["random"]["power"] < 0.5
