@@ -147,6 +147,23 @@ class NgramScorer:
         H = letter_entropy(letters)
         return (avg - self.floor) * (H / ENGLISH_LETTER_ENTROPY)
 
+    def anchored(self, text: str) -> float:
+        """Anchor-normalized score: 0.0 ≈ random text, 1.0 ≈ typical clean language.
+
+        ``(average - random_anchor) / (language_anchor - random_anchor)``, using the
+        scorer's own calibration anchors. Because every model is normalized to *its own*
+        anchors, anchored scores are comparable ACROSS models — an English quadgram
+        model, a terse/route genre model, a word LM — where raw log-probabilities are
+        not. This is what exposes the non-prose blind spot: a true route-register
+        decode sits at the English model's "ghost ceiling" (~0.5–0.7) while scoring
+        ~1.0 under a register-matched model. See :func:`anchored_score` for models
+        that are not :class:`NgramScorer`.
+        """
+        lo, hi = self._random_ref, self._english_ref
+        if hi <= lo:
+            return 0.0
+        return (self.average(text) - lo) / (hi - lo)
+
     def confidence(self, text: str) -> float:
         """Map a candidate's average score to a calibrated 0..1 confidence.
 
@@ -284,6 +301,132 @@ def chi_squared(letters: str) -> float:
         expected = ENGLISH_MONOGRAM_FREQ[chr(65 + i)] * n
         total += (counts[i] - expected) ** 2 / expected if expected else 0.0
     return total
+
+
+def anchored_score(score: float, random_anchor: float, language_anchor: float) -> float:
+    """Normalize any model's score to its own anchors: 0.0 ≈ random, 1.0 ≈ language.
+
+    The cross-model comparability trick for mixed scorer pipelines (quadgram + genre
+    model + word LM): compute each model's score on random text (``random_anchor``)
+    and on typical in-register text (``language_anchor``) once, then compare models on
+    the anchored fraction instead of raw log-probabilities. :meth:`NgramScorer.anchored`
+    does this automatically for bundled n-gram models.
+    """
+    if language_anchor <= random_anchor:
+        raise ValueError("language_anchor must exceed random_anchor")
+    return (score - random_anchor) / (language_anchor - random_anchor)
+
+
+def best_caesar_gauge(text: str) -> tuple[int, float]:
+    """The Caesar shift whose application makes ``text`` best fit English letter
+    frequencies; returns ``(shift, chi_squared_at_shift)``.
+
+    Cheap (26 chi-squared evaluations on one count vector) — cheap enough to run
+    inside a hill-climb objective. See :class:`GaugeNormalizedScorer` for why.
+    """
+    letters = only_letters(text)
+    n = len(letters)
+    if n == 0:
+        return 0, float("inf")
+    counts = [0] * 26
+    for ch in letters:
+        counts[ord(ch) - 65] += 1
+    best_shift, best_chi = 0, float("inf")
+    for shift in range(26):
+        total = 0.0
+        for i in range(26):
+            expected = ENGLISH_MONOGRAM_FREQ[chr(65 + i)] * n
+            c = counts[(i - shift) % 26]  # the letter that +shift maps onto i
+            total += (c - expected) ** 2 / expected if expected else 0.0
+        if total < best_chi:
+            best_shift, best_chi = shift, total
+    return best_shift, best_chi
+
+
+class GaugeNormalizedScorer:
+    """N-gram scoring that is invariant to a global Caesar (alphabet-labelling) gauge.
+
+    Many key parameterizations carry a gauge: an omitted or relabelled alphabet letter,
+    a rotated keyed alphabet, a shifted ring. The *correct* decode then emerges
+    Caesar-shifted, an n-gram model scores it as junk, and the search has **no gradient
+    toward the right answer** — a measured failure mode (one wrong gauge value was 84%
+    of a score cliff). The fix is not to search the gauge as another axis but to
+    normalize it away inside the objective: pick the shift by unigram (chi-squared)
+    fit, THEN n-gram score the normalized text, making all 26 gauge frames reachable
+    from a single climb.
+
+    Wraps any :class:`NgramScorer`; ``score``/``average``/``fitness`` mirror its API.
+    """
+
+    def __init__(self, base: NgramScorer | None = None):
+        self.base = base or get_scorer()
+
+    def normalize(self, text: str) -> str:
+        """``text`` with its best Caesar gauge applied (the shift chi-squared picks)."""
+        letters = only_letters(text)
+        shift, _ = best_caesar_gauge(letters)
+        if shift == 0:
+            return letters
+        return "".join(chr((ord(c) - 65 + shift) % 26 + 65) for c in letters)
+
+    def score(self, text: str) -> float:
+        return self.base.score(self.normalize(text))
+
+    def average(self, text: str) -> float:
+        return self.base.average(self.normalize(text))
+
+    def fitness(self, text: str) -> float:
+        return self.base.fitness(self.normalize(text))
+
+
+def excision_score(
+    text: str,
+    scorer: NgramScorer | None = None,
+    *,
+    excise_len: int | None = None,
+    mode: str = "contiguous",
+    width: int | None = None,
+    step: int = 1,
+) -> dict:
+    """Score exactly the letters a contamination hypothesis claims are language.
+
+    A plaintext with an embedded non-language block (an inserted key, a serial, a
+    coordinate field) drags a whole-text n-gram score down, so a scan over "where is
+    the insert?" hypotheses scores every one of them as junk. This scores the
+    *complement* instead: remove the hypothesized insert and score what remains,
+    maximizing over placements.
+
+    ``mode="contiguous"`` removes a run of ``excise_len`` letters at every position
+    (stride ``step``); ``mode="column"`` removes one residue class mod ``width``
+    (column-shaped inserts in a grid write-in — ``excise_len`` is not used). Returns
+    ``{"score", "at", "mode", "excised"}`` where ``score`` is the best per-window
+    average of the remaining text and ``at`` is the winning position / residue.
+    """
+    scorer = scorer or get_scorer()
+    letters = only_letters(text)
+    if mode == "contiguous":
+        if excise_len is None or not 0 < excise_len < len(letters):
+            raise ValueError(f"excise_len must be in (0, {len(letters)}), got {excise_len}")
+        best: tuple[float, int, str] | None = None
+        for j in range(0, len(letters) - excise_len + 1, step):
+            kept = letters[:j] + letters[j + excise_len:]
+            s = scorer.average(kept)
+            if best is None or s > best[0]:
+                best = (s, j, letters[j:j + excise_len])
+        assert best is not None
+        return {"score": best[0], "at": best[1], "mode": mode, "excised": best[2]}
+    if mode == "column":
+        if not width or width < 2:
+            raise ValueError("mode='column' requires width >= 2")
+        best = None
+        for r in range(width):
+            kept = "".join(c for i, c in enumerate(letters) if i % width != r)
+            s = scorer.average(kept)
+            if best is None or s > best[0]:
+                best = (s, r, letters[r::width])
+        assert best is not None
+        return {"score": best[0], "at": best[1], "mode": mode, "excised": best[2]}
+    raise ValueError(f"mode must be 'contiguous' or 'column', got {mode!r}")
 
 
 # --- vectorized batch scoring (optional numpy accelerator) -------------------
