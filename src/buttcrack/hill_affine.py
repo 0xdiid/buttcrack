@@ -37,6 +37,7 @@ from __future__ import annotations
 import math
 import random
 from dataclasses import dataclass
+from typing import Any
 
 from .ciphers.hill import inverse_mod26, is_invertible_mod26, matrix_from_word
 from .layered import _chi2, _fast_quad_table, _freqs_for, _qscore, alphabet_header
@@ -45,6 +46,7 @@ from .telemetry import Progress, resolve
 from .text import only_letters
 from .validate import long_word_coverage
 
+_np: Any
 try:
     import numpy as _np
 except Exception:  # pragma: no cover

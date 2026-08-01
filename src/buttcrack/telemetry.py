@@ -123,7 +123,8 @@ class Progress:
         """
         ok = limit is None or ops <= limit
         if self.enabled:
-            verdict = "" if ok else f"  >> EXCEEDS LIMIT {_fmt_units(limit)} — SKIPPING"
+            over = "" if limit is None else f"  >> EXCEEDS LIMIT {_fmt_units(limit)} — SKIPPING"
+            verdict = "" if ok else over
             self.note(f"plan {name}: ~{_fmt_units(ops)} ops{verdict}")
         return ok
 

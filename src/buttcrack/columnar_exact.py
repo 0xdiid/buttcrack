@@ -33,10 +33,12 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
+from typing import Any
 
 from .scoring import NgramScorer
 from .telemetry import Progress, resolve
 
+_np: Any
 try:
     import numpy as _np
 except Exception:  # pragma: no cover

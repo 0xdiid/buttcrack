@@ -27,9 +27,11 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 
+torch: Any
 try:
     import torch
 except Exception:  # pragma: no cover
@@ -198,6 +200,9 @@ def solve_deep_gpu(
         pop = newpop
 
     # reconstruct the winning plaintext on the CPU
+    if best_orders is None:
+        raise RuntimeError("no generation produced a scored candidate")
+
     from .columnar_exact import column_adjacency, held_karp_path
     from .stack import _gather, columnar_inverse_index, compose_index
 

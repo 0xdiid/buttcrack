@@ -33,7 +33,7 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from .layered import (
     _chi2,
@@ -89,6 +89,10 @@ def _gather(src: list[int], idx: list[int]) -> list[int]:
 
 
 # -- peeling the outer periodic substitution -----------------------------------
+
+
+if TYPE_CHECKING:
+    from .columnar_exact import ColumnarSolution
 
 
 @dataclass
@@ -270,8 +274,8 @@ def _anneal_double_np(
     n = arr.size
     rng = rng or random.Random(0)
 
-    inv_cache1 = {}
-    inv_cache2 = {}
+    inv_cache1: dict[tuple[int, ...], Any] = {}
+    inv_cache2: dict[tuple[int, ...], Any] = {}
 
     def idx_for(o1, o2):
         k1, k2 = tuple(o1), tuple(o2)
@@ -938,6 +942,7 @@ def crack_with_keystream(
                 for i in range(n)
             ]
             text = "".join(header[v] for v in stream)
+            cands: list[tuple[float, ColumnarSolution | None, str]]
             if layers == 0:
                 cands = [(scorer.score(text) / max(n, 1), None, text)]
             else:
