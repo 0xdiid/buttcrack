@@ -27,15 +27,17 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING
 
 import numpy as np
 
-torch: Any
-try:
+if TYPE_CHECKING:  # torch is an optional extra and is absent from the CI type env
     import torch
-except Exception:  # pragma: no cover
-    torch = None
+else:
+    try:
+        import torch
+    except Exception:  # pragma: no cover
+        torch = None
 
 
 def _device(prefer: str | None = None) -> str:

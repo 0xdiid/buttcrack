@@ -33,16 +33,14 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Any
 
 from .scoring import NgramScorer
 from .telemetry import Progress, resolve
 
-_np: Any
-try:
+try:  # optional acceleration only; the package itself stays dependency-free
     import numpy as _np
-except Exception:  # pragma: no cover
-    _np = None
+except Exception:  # pragma: no cover - numpy is present in dev/test
+    _np = None  # type: ignore[assignment]  # optional-dependency fallback sentinel
 
 
 @dataclass
