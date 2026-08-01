@@ -133,6 +133,44 @@ class BifidCribProblem:
         return [(seq[2 * k], seq[2 * k + 1]) for k in range(length)]
 
 
+def decode_with(problem: BifidCribProblem, square: str, strip: tuple[int, ...]) -> str:
+    """Decrypt the whole ciphertext under a recovered ``(square, strip)``.
+
+    A crib pins only the cells its own letters touch, so two keys can satisfy the same crib
+    and disagree everywhere else. Reading the rest of the message is therefore the only way
+    to tell "consistent with the crib" from "actually the key" — and that distinction is the
+    whole point of a crib program, which is why the solver must return the plaintext rather
+    than just the key.
+    """
+    pos = {c: i for i, c in enumerate(problem.alphabet)}
+    gidx = {c: i for i, c in enumerate(square)}
+    ct = problem.ciphertext
+    p = problem.period
+
+    if problem.additive:
+        if problem.orientation == "vig":
+            inter = [(pos[c] - strip[i % p]) % 26 for i, c in enumerate(ct)]
+        else:
+            inter = [(strip[i % p] - pos[c]) % 26 for i, c in enumerate(ct)]
+        inter_s = "".join(problem.alphabet[v] for v in inter)
+    else:
+        inter_s = ct
+
+    out = [""] * len(ct)
+    for start, ln in problem.blocks():
+        blk = inter_s[start : start + ln]
+        if any(c not in gidx for c in blk):
+            return ""  # a letter outside the grid: this key cannot have produced it
+        seq = [0] * (2 * ln)
+        for k, c in enumerate(blk):
+            r, col = divmod(gidx[c], 5)
+            seq[2 * k], seq[2 * k + 1] = r, col
+        rows, cols = seq[:ln], seq[ln:]
+        for i in range(ln):
+            out[start + i] = square[rows[i] * 5 + cols[i]]
+    return "".join(out)
+
+
 def solve_bifid_crib(
     problem: BifidCribProblem,
     max_solutions: int = 1,
@@ -174,6 +212,33 @@ def solve_bifid_crib(
     # relabelling the square -- but the grid holds only 25 of the 26 ring letters, so a
     # shift would need to place the excluded letter. The exclusion breaks the symmetry
     # and different gauges are genuinely different keys. Pinning strip[0] loses solutions.
+
+    # Every position, not just the cribbed ones, constrains the strip: the intermediate
+    # letter (ct minus the strip, or the beau equivalent) is written with the 25-cell
+    # square, so it can NEVER be the excluded letter. That is one constraint per
+    # ciphertext position and it is entirely crib-independent -- without it a crib
+    # covering two blocks leaves the other nineteen saying nothing, and the solver
+    # returns strips that could not decode the full text at all.
+    excluded = set(P.alphabet) - set(P.grid)
+    for k in range(P.period):
+        positions = [i for i in range(len(P.ciphertext)) if i % P.period == k]
+        allowed = []
+        for v in range(26):
+            ok = True
+            for i in positions:
+                ct_i = P._idx[P.ciphertext[i]]
+                inter = (ct_i - v) % 26 if P.orientation == "vig" else (v - ct_i) % 26
+                if P.alphabet[inter] in excluded:
+                    ok = False
+                    break
+            if ok:
+                allowed.append([v])
+        if not allowed:
+            # No strip value can keep this residue class inside the grid: the whole
+            # problem is infeasible, and saying so is a proof.
+            m.AddBoolOr([])
+        else:
+            m.AddAllowedAssignments([strip[k]], allowed)
 
     blocks = P.blocks()
     for crib in P.cribs:
@@ -232,7 +297,8 @@ def solve_bifid_crib(
             for i, c in enumerate(G):
                 sq[self.Value(cell[i])] = c
             st = tuple(self.Value(s) for s in strip)
-            sols.append(CribSolution("".join(sq), st, ""))
+            sqs = "".join(sq)
+            sols.append(CribSolution(sqs, st, decode_with(P, sqs, st)))
             self.n += 1
             if self.n >= max_solutions:
                 self.StopSearch()
@@ -242,5 +308,7 @@ def solve_bifid_crib(
         sq = [""] * 25
         for i, c in enumerate(G):
             sq[solver.Value(cell[i])] = c
-        sols.append(CribSolution("".join(sq), tuple(solver.Value(s) for s in strip), ""))
+        sqs = "".join(sq)
+        st = tuple(solver.Value(s) for s in strip)
+        sols.append(CribSolution(sqs, st, decode_with(P, sqs, st)))
     return sols, solver.StatusName(status)
