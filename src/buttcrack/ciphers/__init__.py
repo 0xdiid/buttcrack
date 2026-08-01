@@ -32,6 +32,7 @@ from .gromark import Gromark
 from .gronsfeld import Gronsfeld
 from .headline import Headline
 from .hill import Hill
+from .hill_additive import HillAdditive
 from .homophonic import Homophonic
 from .incomplete_columnar import IncompleteColumnar
 from .interrupted_key import InterruptedKey
@@ -148,6 +149,7 @@ ALL_CIPHERS: tuple[type[Cipher], ...] = (
     Grille,
     SequenceTransposition,
     Hill,
+    HillAdditive,
     Bazeries,
     M94,
     Chaocipher,
