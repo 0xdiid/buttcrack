@@ -37,7 +37,6 @@ from __future__ import annotations
 import math
 import random
 from dataclasses import dataclass
-from typing import Any
 
 from .ciphers.hill import inverse_mod26, is_invertible_mod26, matrix_from_word
 from .layered import _chi2, _fast_quad_table, _freqs_for, _qscore, alphabet_header
@@ -46,11 +45,10 @@ from .telemetry import Progress, resolve
 from .text import only_letters
 from .validate import long_word_coverage
 
-_np: Any
-try:
+try:  # optional acceleration only; the package itself stays dependency-free
     import numpy as _np
-except Exception:  # pragma: no cover
-    _np = None
+except Exception:  # pragma: no cover - numpy is present in dev/test
+    _np = None  # type: ignore[assignment]  # optional-dependency fallback sentinel
 
 
 @dataclass
