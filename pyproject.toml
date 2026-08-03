@@ -32,6 +32,10 @@ dev = ["pytest>=7", "pytest-xdist>=3", "ruff>=0.6", "mypy>=1.8", "numpy>=1.24"]
 # imports OR-Tools lazily and raises a pointed ImportError if it is absent, so the
 # package keeps its zero-runtime-dependency promise.
 csp = ["ortools>=9.10"]
+# Char-level neural scoring (buttcrack.neural_scorer, and the neural backend of
+# buttcrack.running_key). Optional and lazily imported: n-gram scoring keeps working
+# without it, it is just measurably weaker (2.74 vs 2.07 bits/char).
+neural = ["torch>=2.0"]
 
 [project.scripts]
 butt = "buttcrack.cli:main"
