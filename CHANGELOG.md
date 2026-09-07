@@ -6,6 +6,17 @@ and not yet published, so changes are grouped by milestone rather than release.
 
 ## Unreleased
 
+### Added — exact periodic-key sum recovery
+
+- `butt additive` analyzes any number of periodic components, including shared factors
+  and repeated periods, and solves fixed or bounded floating cribs exactly modulo 26.
+  Undetermined positions stay unknown; contradictory cribs are reported explicitly.
+- Bounded dictionary decomposition preserves equivalent word tuples and reports caps
+  separately from exhaustion. Candidate audits record every input, filter decision,
+  and a stable digest; search receipts scope conclusions to the declared manifest.
+- Synthetic regression tests cover recovery, ambiguity, contradictions, and limits.
+  See [the additive-key guide](docs/additive-keys.md) for assumptions and examples.
+
 ### Added — coverage gaps closed against dCode and CrypTool 2
 
 A capability audit against [dCode](https://www.dcode.fr/tools-list#cryptography) and
