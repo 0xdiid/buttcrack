@@ -105,21 +105,25 @@ nothing reads, *"no significant period — don't assume running-key, try a crib-
 
 `butt stats` also reports **IoC drift** (per-segment index-of-coincidence and its
 z-scored slope): a monotonic decay along the message marks an *evolving / non-stationary
-keystream* (progressive-key, autokey, chain-addition, dynamic alphabet, or OTP-grade)
-whose period can't be recovered. `identify` routes on this, diagnosing a **non-stationary
-keystream** and pointing at a crib — and a real decay *rules out* the transposed-periodic
-family (which has flat, stationary IoC). See the [cryptanalysis tips](docs/cryptanalysis-tips.md)
-§9 for the full periodic-OUTER / periodic-under-transposition / non-stationary triage.
+keystream* hypothesis. A segment-IoC slope is compared with shuffled inputs; it
+can also reflect finite-sample variation or a changing plaintext distribution.
+It does not rule out periodic/transposed constructions or prove that a crib is
+required. See the [cryptanalysis tips](docs/cryptanalysis-tips.md) for scope and
+competing explanations.
 
 **`butt diagnose [text]`** rolls the whole triage into one report: it runs the period
-spectrum, lag autocorrelation, IoC-decay, evolving-keystream fingerprint and the N/lcm
-crackability cliff, then prints a **structure-class verdict and the concrete `butt` commands
+spectrum, lag autocorrelation, IoC-decay, evolving-keystream fingerprint and
+length/period heuristics, then prints a **structure-class verdict and the concrete `butt` commands
 to try next** — the fastest way to answer "what kind of layered cipher is this and how do I
 attack it". For the layered families themselves: `butt layered` (substitution OVER a
 transposition), `butt transsub` (transposition OVER a substitution, incl. `--keyword-pairs`
 for the double-columnar shape), and `butt crib --product/--keyed/--autokey` for
 crib-anchored product / keyed-alphabet / autokey solvers. A field guide of hard-won
 cryptanalysis lessons lives in [docs/cryptanalysis-tips.md](docs/cryptanalysis-tips.md).
+For planning experiments, validating searches, and keeping conclusions within their
+evidence, follow the [research workflow](docs/research-workflow.md).
+Treat diagnostic classes and length/period heuristics as attack recommendations,
+not proofs of cipher identity or impossibility.
 
 ### Exit codes
 

@@ -2,45 +2,41 @@
 
 A field guide for driving `butt` (human or agent) against an unknown ciphertext.
 Distilled from real solves — especially the things that wasted time before they
-became obvious.
+became obvious. For experiment planning, evidence records, and handoffs, use the
+[research workflow](research-workflow.md). Numerical examples below describe
+particular measurements; they are not universal recovery thresholds.
 
-## 0. Validate a solver before you trust its *failure*
+## 0. Validate a solver before interpreting its failure
 
-The single highest-leverage habit. Before concluding "cipher X is ruled out
-because its cracker returned gibberish," confirm the cracker can solve a **known**
-instance of X at the same length:
+A solver returning no readable candidate establishes a search result under its
+actual settings. Before using that result to deprioritize a hypothesis, test
+independent synthetic instances with comparable length, key geometry, alphabet,
+payload type, and budget. One recovered example does not establish uniform power.
 
-```bash
-CT=$(butt encode quagmire3 "$(head -c 200 some_english.txt)" --key "AUTOMOBILE/HIGHWAY")
-butt crack quagmire3 "$CT"      # does it come back?
-```
+Separate arithmetic correctness, recognition of a deliberately included bank
+candidate, and blind recovery. Pass fixtures through the same filters as real
+inputs; keep fixture generation independent of solver starts. The
+[workflow validation checklist](research-workflow.md#3-validate-the-instrument)
+describes the checks and what a failed gate means.
 
-If it can't crack its own output at that length, a blank result tells you nothing
-about your real ciphertext — you've learned about the *solver*, not the cipher.
-Keyless hill-climbing of keyed-alphabet ciphers, in particular, is **infeasible at
-ACA lengths (~200 letters)**; don't read its silence as "not this cipher."
+A near-readable plateau warrants checking fixed parameters, the scoring objective,
+initialization, and convergence. It does not by itself diagnose a wrong parameter,
+a bug, or fundamental ambiguity. Compare multiple fixtures before choosing which
+explanation to pursue.
 
-Corollary: a *known-instance* solve also tells you when a plateau is a bug, not a
-wall. If a known instance of your structure recovers to 100% but the real one
-sticks at ~80%, the difference is a *wrong parameter you're holding fixed* (wrong
-key length, wrong transposition width/order), not fundamental ambiguity — go hunt
-the parameter, don't blame the cipher. (This is exactly how a stuck real-world
-layered puzzle got unstuck: the columnar order was a near-miss.)
+## 0b. Check the objective and convergence before increasing restarts
 
-## 0b. When a search over a permutation/order plateaus, fix the *objective's convergence*, not the restarts
+When a search ranks outer candidates by running an inner optimizer, a truncated
+inner solve can rank a wrong outer candidate above the correct one. On synthetic
+examples, compare the ranking as the inner budget increases. Check that the
+implemented objective includes every term its documentation promises; use a small
+exhaustive oracle where possible.
 
-If you're searching a discrete order (column read-order, route, key permutation)
-and ranking each candidate by "recover the rest, then score," the per-candidate
-recovery **must run to convergence**. A *truncated* inner optimizer (a fixed few
-passes) under-converges, so a near-miss candidate scores almost as high as the
-truth and gets ranked first — you converge on a plausible-but-wrong answer and
-plateau. A **deterministic full climb to convergence (no random restarts)** both
-reaches clean English for the true candidate and removes restart noise, so
-candidate scores are directly comparable and the truth separates by a wide margin
-(e.g. ≈−4.1/quadgram for the true column order vs ≈−5.1 for near-misses). Reach for
-more restarts only after the inner optimizer is actually converging. (Field note: an
-order search with a 3-pass recovery objective ranked a near-miss order #1 for a day;
-a full climb found the true order immediately.)
+A deterministic inner climb makes repeated evaluations reproducible, but reaching
+a local optimum does not guarantee the correct plaintext or a fair ranking across
+all candidates. If multiple starts are needed, give candidates comparable budgets
+and record how starts are chosen. Preserve the full candidate and residual at a
+plateau so alternative parameters or models can revisit it.
 
 ## 1. Fingerprint before you swing
 
@@ -55,7 +51,9 @@ butt identify <ct> --json   # family routing from IoC + letter-fit
     order is scrambled, it's transposition (`columnar/railfence/...`).
   - **~0.038–0.045 (flat)** — polyalphabetic *or* fractionation. The plaintext's
     letter frequencies have been smeared.
-- A flat IoC **rules out plain transposition** outright (it would keep 0.066).
+- A transposition preserves the input IoC exactly. Flat ciphertext IoC therefore
+  weighs against ordinary prose under pure transposition, but cannot exclude
+  atypical plaintext or a composition with another cipher.
 - **Don't eyeball the monoalphabetic-vs-transposition call** — `butt stats`/`identify`
   report `chi_squared_per_letter`: **low (~<0.05)** means the letter frequencies still
   match English even though the order is scrambled (→ a **transposition**), while a
@@ -77,11 +75,11 @@ ciphertext) on its own. Reversal and null-stripping are *not* auto-applied — a
 confident overfit can make a forward sweep look "solved", so deciding it failed is
 unreliable; try `transform` by hand when a solve won't come.
 
-## 2. Find the period (polyalphabetic)
+## 2. Investigate candidate periods (polyalphabetic)
 
-Split the text into `period` columns and take the **mean per-column IoC**. The
-true period is where it jumps back toward English (~0.066); multiples of it light
-up too.
+Split the text into `period` columns and take the **mean per-column IoC**. A
+periodic substitution can produce peaks toward the plaintext IoC; multiples may
+peak too. Short samples, mixtures, and compositions can produce other peaks.
 
 **Use a calibrated baseline, not an absolute threshold, and scan far enough.**
 This is the trap that makes a long-key periodic cipher look like "no period":
@@ -96,8 +94,8 @@ This is the trap that makes a long-key periodic cipher look like "no period":
 So: scan periods up to ~**length / 5** (not just ≤15), and rank by z vs a
 random-text baseline — `butt stats` now reports this as **`periodic_ioc`**
 (`{period, ioc, baseline, z}`, z > ~3 is strong). `likely_periods` (Kasiski) is a
-second, independent read. A clean peak at *p* **and** *2p* with troughs between is
-solid even on ~190 letters.
+second, independent read. A peak at *p* and *2p* motivates testing those periods, but does not identify
+the complete construction. Account for the full scan when calibrating (§18).
 
 Corollary: **"no obvious period" is NOT evidence of a running key.** Flat overall
 IoC with no short-period spike is *also* what a long-key Vigenère/Quagmire looks
@@ -315,13 +313,14 @@ no obvious period":
 
 1. **A long-key periodic cipher** (Vigenère / Quagmire). Run the calibrated
    long-period scan (§2) up to ~length/5 — a period-40 key on 280 letters hides
-   here. If a period is significant, it's periodic, not running-key.
+   here. A significant peak prioritizes a periodic model; it does not exclude other models.
 2. **A keyed-alphabet periodic** with a non-word key — solvable by the dictionary
    + restart hill-climb (§4), no source text needed.
 
-Only if no period is significant at any length *and* the keyed-alphabet attacks
-fail should you treat it as running-key — and even then, report it as a blended
-two-stream decomposition, not a clean solve.
+A known source text can make a running-key test cheap enough to try early.
+Otherwise prioritize the cheaper periodic tests, but retain both hypotheses:
+failed keyed-alphabet attacks do not establish a running key. Report a blended
+two-stream decomposition as a candidate, not a clean solve.
 
 ## 8. What `butt` can and can't blind-crack (honest limits)
 
@@ -379,54 +378,39 @@ and the line is exactly where a *mapping-independent* statistic survives:
   column shifts) and detects regular repeated-bigram periodicity (`stats`
   `transposition_periods`), but the general Z340-class blind solve is out of scope.
 
-The unifying test (see §4b): a search-based solver only works when its fitness has a
-gradient — perturb the known answer by one move and check the score degrades
-*gradually*. Transposition orders and fractionation squares pass; keyed substitution
-alphabets (and the keyed-over-transposition product) don't, which is why those stay
-crib- or dictionary-driven.
+For local-search methods, perturb synthetic known answers and inspect the score
+landscape (§4b). A useful local gradient can help optimization; a flat or deceptive
+one warns against trusting that optimizer's failure. This diagnostic is not a
+proof about exhaustive, algebraic, dictionary, or crib-based methods.
 
-## 9. The layer-order / keystream triage (the single biggest time-saver)
+## 9. Use layer-order diagnostics to prioritize competing attacks
 
-You have **flat IoC and no obvious short period.** Three very different ciphers look
-identical here, and each wants a *different* attack. Spend two minutes splitting them
-apart before you swing — guessing wrong burns hours on a search that *can't* work.
+Flat IoC and no obvious short period fit several constructions. The following
+signals suggest experiments; they do not partition all possible ciphers.
 
-| Case | What it is | Tell | Attack |
-|---|---|---|---|
-| (a) | **Periodic substitution, OUTER** | calibrated **colIoC spike** at the period in the *raw* text | the periodic solver at that period |
-| (b) | Periodic substitution, **INNER**, under a transposition | **no** raw spike — but undoing the right transposition makes the spike **reappear** | `butt transsub` (reveal discriminator) |
-| (c) | **Non-stationary / evolving keystream** | IoC **drifts down** the message (`ioc_decay`, `slope_z <= -2.5`) | none blind — needs a crib |
+| Hypothesis | Possible signal | Next experiment |
+|---|---|---|
+| Periodic substitution outside a transposition | Raw coset-IoC peaks | Test periods with `butt layered` |
+| Periodic substitution beneath a transposition | Peaks strengthen after candidate untranspositions | Test the reveal objective with `butt transsub` |
+| Position-dependent key or changing plaintext distribution | Segment IoC changes along the message | Inspect segments and test explicit models, source texts, or cribs |
 
-**(a) Periodic substitution as the OUTER layer.** The substitution period is visible in
-the *raw* ciphertext column-IoC spectrum (§2) — a calibrated colIoC spike at the period
-(harmonics at multiples). `butt layered` handles this shape. The period
-showing in the raw text is exactly what marks the substitution as outermost.
+A periodic outer substitution can preserve within-coset distributions, but the
+observed peak need not identify the complete key period or every layer. An outer
+transposition can weaken an inner period signal; a coset-preserving permutation
+leaves that statistic unchanged (§17). Validate the reveal objective on synthetic
+examples of the actual period and transposition geometry before trusting a
+negative search.
 
-**(b) Periodic substitution hidden UNDER a transposition.** A transposition applied
-*over* a periodic substitution **destroys the raw spike** — the columns are shuffled, so
-the period is invisible in the raw spectrum. The lever is **mapping-independent**: undo a
-candidate transposition and the per-column IoC spike **reappears** at the inner period,
-because the inner substitution's per-period columns go monoalphabetic again *regardless of
-which keyed alphabet was used* (the IoC doesn't depend on the alphabet → no need to solve
-the substitution first to peel the transposition). This is the `reveal_score`
-discriminator productized in `butt transsub` (single columnar by keyword sweep, double by
-SA over the two read-orders). Crucially, `reveal_score` has a usable **gradient before the
-substitution is solved**, where a quadgram objective does not — which is why search peels
-this layer where it can't peel a keyed alphabet (§4, §8).
+`ioc_decay` measures a segment-IoC slope and compares it with shuffled inputs.
+A flagged slope is evidence relative to that shuffle generator. It does not prove
+a dynamic key or exclude a periodic/transposed construction: finite samples and
+changing plaintext distributions can also produce slopes. Dynamic-key families
+do not universally produce monotone IoC decay either.
 
-**(c) Non-stationary / evolving keystream.** Progressive-key, autokey, chain-addition
-(Gromark), dynamic-alphabet (Chaocipher, Hutton), or OTP-grade keystreams are
-*position-dependent*: they start more structured and grow toward random, so per-segment
-IoC **decreases along the message.** `butt`'s new `ioc_decay` fits that slope and z-scores
-it against shuffles of the same letters; `slope_z <= -2.5` (`non_stationary: true`) is the
-fingerprint. There is no period to recover and no transposition to peel — a crib is the
-only lever.
-
-> **The decisive cross-check:** a transposed-periodic cipher (cases a/b) has **FLAT,
-> STATIONARY IoC** — every segment reads the same in expectation, because transposition
-> just reorders letters and a *periodic* keystream repeats. So a **real IoC decay RULES
-> OUT** the transposed-periodic family outright. If `ioc_decay` fires, stop hunting for a
-> period or a transposition order; you're in case (c) and only a crib will move it.
+Treat `diagnose` labels and thresholds as routing heuristics. Keep alternative
+hypotheses available, especially when the recommended attack fails its recovery
+gate. A crib or known source may help, but a detector cannot prove that external
+information is required.
 
 ## 10. Search-aware nulls: calibrate against the *shuffled search*, not one random text
 
@@ -436,10 +420,14 @@ structureless text will hand you a surprisingly high maximum *simply because so 
 candidates were tried.* Comparing that maximum to **one** random text (or to the
 random-text mean) is the wrong null and manufactures false positives.
 
-The honest null is the **same search run on shuffles of the same letters** —
-`analysis.search_aware_null(letters, search, samples=…)`, which returns
-`{observed, null_mean, null_max, z, beats_null_max}`. Treat the result as signal only when
-it **beats the shuffled-search max** (`beats_null_max`), not just the mean.
+Choose a null generator that matches the claim, then repeat the same search,
+budget, and selection procedure on every null sample. Ordinary letter shuffles
+are useful for some questions but destroy coset structure and other dependencies.
+`analysis.search_aware_null(letters, search, samples=…)` implements the shuffled
+search comparison and returns `{observed, null_mean, null_max, z, beats_null_max}`.
+Beating the sampled maximum is finite-sample evidence against that generator,
+not a proof of cipher identity or a universal significance threshold. Record the
+sample count and any choices made after inspecting the result.
 
 > **The concrete trap (it cost real time):** a `transsub` double-columnar 'reveal' looked
 > like a z=7.8 spike against the random-text mean — apparently a slam-dunk transposition.
@@ -449,41 +437,49 @@ it **beats the shuffled-search max** (`beats_null_max`), not just the mean.
 > statistics: a high score is only signal once it clears the null appropriate to **how it
 > was selected.**
 
-## 11. Validate-on-synthetic before you trust a NEGATIVE
+## 11. Keep negative conclusions within the tested domain
 
-A negative ("this attack found nothing, so it isn't cipher X") is **worthless from an
-un-validated attack** — see §0, here sharpened for layered/keystream work. Before
-believing a blank result:
+Before interpreting a search failure, retain the exact equation, alphabet,
+parameter domain, candidate generator and filters, plaintext assumptions, solver
+version, budget, and recovery-gate results. Preserve the actual candidate manifest
+rather than relying on a prose description of its intended scope.
 
-1. **Confirm the attack RECOVERS a same-structure synthetic** at the same length. Encode a
-   known plaintext with the exact construction you suspect and check the attack returns it.
-   If it can't crack its own output, its silence on the real text tells you nothing.
-2. **Pin the genuine-solve signature** so you can recognize the real thing when it appears
-   and detect a near-miss plateau. For a short (~270-char) panel a validated English solve
-   typically sits near **qscore/char ≈ −4.2** and **word_coverage ≈ 0.69**; a candidate
-   scoring like English on quadgrams but with low word-coverage is salad, and a plateau a
-   hair below the signature is a *wrong fixed parameter* (period, width, order), not the
-   cipher being unbreakable.
+Use distinct outcomes: exact contradiction, exhausted bank, failed recovery gate,
+timeout, cap, interruption, statistical mismatch, or candidate found. A failed
+gate describes an unvalidated search configuration. Passing gates describes
+recovery on those fixtures; it does not turn a target failure into proof that the
+family is impossible. Fixed n-gram or word-coverage thresholds are not universal
+solve signatures, especially for unusual payloads (§19).
 
-This discipline is what lets a negative stand as a *validated* "blind-unbreakable" rather
-than a guess: every attack in scope is first shown to recover a synthetic of the same shape
-at the same length, and only then run on the real text.
+The [workflow](research-workflow.md#5-record-the-outcome-with-its-scope) provides a
+copyable evidence record. The [candidate audit and receipt APIs](additive-keys.md#audit-the-candidate-universe)
+can support it, but do not independently certify recovery power or proofs.
 
-## 12. The N/lcm ≈ 2.5 crackability cliff (the OTP-grade test)
+## 12. Count independent parameters, not just the combined period
 
-A periodic or product keystream is blind-recoverable **only while it repeats enough.** The
-useful single number is the **effective period** vs message length: a key (or the lcm of
-two combined keystreams) is recoverable while
+Few observations per key phase make ordinary periodic-key frequency attacks less
+reliable. This is a solver and data limitation, not a universal crackability cliff.
+There is no general message-length-to-period ratio that makes a construction
+one-time-pad secure or proves that a crib is necessary.
 
-> effective period **< ~length / 4** (equivalently, N / lcm **>~ 2.5** cycles in the message).
+In particular, a sum of short repeating keys can have an aggregate period longer
+than the message while retaining a small number of independent parameters. Keep
+that factorization when selecting an attack. Shared factors and repeated periods
+create additional redundancies; do not exclude them for convenience.
 
-Past that cliff the keystream barely repeats, every statistic flattens, and — *even if you
-are handed the correct period* — the columns hold too few letters to fix and the
-construction collapses to noise. This is mapping-independent and unsentimental: a product
-keystream with N/lcm ≈ 2.5 is OTP-grade and needs a **crib or a known opening**, while a
-repeating period-45 substitution over a width-8 columnar at the same length cracks clean.
-When you compute a candidate effective period, check it against this cliff *before* investing in
-a search; below ~2.5 cycles, no search budget substitutes for a crib.
+```bash
+butt additive analyze --periods 2 3 6 8
+```
+
+This synthetic example has an aggregate period bound of 24, 19 raw coordinates,
+and 12 effective coordinates. Neither the period bound nor the raw count alone
+describes its recovery problem. Known plaintext constrains those coordinates;
+word banks add a different restriction. See [exact additive recovery](additive-keys.md)
+for partial solutions, contradictions, and bounded dictionary decomposition.
+
+A supplied crib is an assumption. After fitting it, examine predictions outside
+the crib and retain alternative compatible solutions. Re-encryption establishes
+consistency with the proposed model, not uniqueness or the intended reading.
 
 ## 13. Close the dictionary-order gap with incomplete-columnar full enumeration
 
@@ -628,38 +624,27 @@ recover_matrix(known_pt, ct, n=3, alphabet="STD", offset=0)  # crib may start mi
 recover_affine(known_pt, ct, n=3, q=2, alphabet="KRYPTOS")  # matrix + period-q additive
 ```
 
-## 17. The coset-preserving transposition: an honest, provable blind wall
+## 17. When a statistic is invariant, change the discriminator
 
-§9(b) says a transposition under a periodic substitution is peelable because undoing the right
-order makes the per-column IoC spike **reappear** (`reveal_score` has a gradient before you solve
-the sub). There is one shape where that lever fails *by construction*, and recognising it saves you
-from an unwinnable search: a **coset-preserving** transposition — one that permutes letters only
-*within* each residue class mod the substitution period `p` (each mod-`p` column is scrambled
-internally, never across columns).
+A coset-preserving transposition permutes positions only within each residue class
+modulo a period. It preserves every coset's letter multiset and therefore its IoC.
+A search that scores only that IoC cannot rank such permutations. This proves a
+limitation of the statistic, not that no other attack can work.
 
-- It leaves **every coset's multiset unchanged**, so **coset-IoC is invariant under it** — the raw
-  spectrum already shows the period, and no un-winding changes it. `reveal_score` is flat across all
-  candidate orders: there is nothing to reappear.
-- It kills **kappa(p)** (the within-column *adjacency* is destroyed) while preserving the coset
-  distributions — the fingerprint of "peaked in multiset but order-scrambled".
-- Consequence: at a single message length the winding is **not blind-detectable** and the
-  per-coset key is **not blind-recoverable** — the space of within-coset permutations is `(n/p)!`
-  per coset and no statistic ranks it. This is a genuine information wall, not a missing solver.
+Adjacency statistics can change under these permutations, but need not vanish.
+Constrained routes, language models, keys, or cribs may provide other evidence;
+test their recovery on independent synthetic cases. Do not infer a universal
+information barrier from a flat objective.
 
-**Two things follow, both now tooled.**
+`windings.coset_preserving_shuffle(ct, p, rng=…)` supplies a conditional null when
+the question concerns ordering given the coset multisets. Under that null, coset
+IoC itself is constant and cannot discriminate. An ordinary letter-shuffle null
+asks a different question because it destroys those multisets.
 
-1. **Calibrate coset statistics with the RIGHT null.** A coset-IoC "spike" must be compared to a
-   null that *also* preserves the cosets — otherwise a plain letter-shuffle null (which destroys the
-   cosets) is trivially beaten and manufactures a false positive. Use
-   `windings.coset_preserving_shuffle(ct, p, rng=…)` (shuffles only within each residue class) as the
-   null twin; `windings` also generates the coset-preserving permutations themselves (affine / fold /
-   faro per class) and triangular (`T_n`) reads for the winding search.
-2. **Past the wall, you need external information, not more search.** A crib (§4b/§16a), or — the
-   high-value move in a chain — the **sibling**: if two unsolved messages share the construction, the
-   pair carries roughly twice the data of either alone. `butt compare ct_a ct_b` tests exactly that
-   (sorted-frequency-profile distance, a shared period/kappa signature — including the tell of *one
-   wound, one flat* = same substitution, different winding — and a two-ciphertext additive
-   superimposition), so you learn whether to attack them jointly before you invest.
+Multiple messages or a known source can add constraints when there is evidence
+that keys or structure are shared. Similar fingerprints alone do not establish
+that relationship, and a failed single-message search does not prove that extra
+messages are required.
 
 ## 18. Look-elsewhere: a period SCAN needs the family null too (`butt stats --family`)
 
@@ -668,8 +653,8 @@ internally, never across columns).
 best of 15–50 periods, so the maximum is selection-inflated. A per-period `z ≈ +3` on a short
 message is routinely multiplicity noise. `butt stats --family` (`analysis.period_family_significance`)
 reports the honest number: the strongest period's calibrated z vs the distribution of the **max
-calibrated z over the whole grid** on shuffles of the same letters. Believe a period only when it
-clears that family null (`beats_null_max` / small `family_p`), not merely on a high per-period z —
+calibrated z over the whole grid** on shuffles of the same letters. Use that family comparison (`beats_null_max` / `family_p`) when prioritizing periods,
+rather than a high per-period z alone. It remains conditional on the shuffle model —
 random text will hand you a period at `z ≈ +2.5` that dies at `family_p ≈ 0.3`.
 
 ## 19. Non-prose payloads: the right decrypt can score as gibberish
@@ -683,3 +668,28 @@ candidates with `butt nonprose` (a route/instruction genre model vs a prose mode
 — `leans_nonprose` flags a candidate that reads as directions/coordinates even though the prose score
 looks weak. When the aligned-coset modal is well above prose's ~0.12, suspect a structured payload
 and stop trusting the English gate.
+
+
+## 20. Preserve partial results and audit the candidate pipeline
+
+A correct outer-layer removal may leave unreadable ciphertext. Keep its residual,
+key, transformation convention, and rejection reason. If it fails a test for one
+inner family, reject that combination; do not discard the outer key for every
+possible inner family. Retain a bounded, diverse set of residuals rather than only
+the best language score, and record the retention rule as another filter.
+
+Before launching a large bank search, check short words, boundary lengths,
+shared-factor periods, repeated components, and equivalent parameterizations
+through the complete generation and filtering pipeline. A successful plant inserted
+after filtering cannot detect an upstream omission. `butt additive bank` makes
+word exclusions inspectable; it does not prove that a vocabulary is complete.
+
+Write compositions as equations in a named alphabet with explicit phases and
+operation order. Combine commuting additive operations where valid, while keeping
+their key structure. Test order separately for operations that do not commute.
+Distinguish a recovered numeric key from its possible word interpretation.
+
+Keep source hints separate from interpretations. A theme can prioritize candidate
+words or constructions without requiring literal substrings or a particular
+architecture. Periodically review excluded candidates and unsupported assumptions;
+see the [research workflow](research-workflow.md#6-review-correct-and-hand-off).

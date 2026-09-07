@@ -6,6 +6,14 @@ and not yet published, so changes are grouped by milestone rather than release.
 
 ## Unreleased
 
+### Documentation — reproducible research workflow
+
+- Add a workflow for candidate-domain audits, independent recovery gates, scoped
+  outcomes, correction dependencies, crash recovery, and private-data handling.
+- Update the tips to distinguish statistical fingerprints and solver limitations
+  from exact exclusions; replace universal period-ratio and blind-wall claims
+  with conditional guidance.
+
 ### Added — exact periodic-key sum recovery
 
 - `butt additive` analyzes any number of periodic components, including shared factors
