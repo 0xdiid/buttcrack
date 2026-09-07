@@ -181,6 +181,86 @@ def _cmd_auto(args) -> int:
     return _exit_code(result)
 
 
+def _cmd_additive(args) -> int:
+    from .additive_crib import analyze_periods, drag_additive_crib, solve_additive_crib
+    from .additive_words import recover_word_keys
+    from .keysources import _alphabet
+    from .search_coverage import audit_word_bank
+
+    alpha = _alphabet(args.alphabet)
+    if args.action != "bank" and not args.periods:
+        raise InputError("--periods is required for this action")
+    if args.action == "analyze":
+        result = analyze_periods(args.periods)
+    elif args.action == "bank":
+        if not args.wordlist:
+            raise InputError("bank audit requires --wordlist")
+        with open(args.wordlist, encoding="utf-8") as words_file:
+            result = audit_word_bank(
+                words_file,
+                min_length=args.min_length,
+                max_length=args.max_length,
+                alphabet=alpha,
+            ).to_dict()
+    elif args.action == "words":
+        if not args.wordlist or not args.pad:
+            raise InputError("word recovery requires --wordlist and --pad")
+        pad = [None if x.strip() == "?" else int(x) for x in args.pad.split(",")]
+        with open(args.wordlist, encoding="utf-8") as words_file:
+            result = recover_word_keys(
+                pad,
+                args.periods,
+                words_file,
+                alphabet=alpha,
+                max_nodes=args.max_nodes,
+                max_results=args.max_results,
+            )
+    else:
+        fragments = []
+        for value in args.fragment or []:
+            offset, separator, text = value.partition(":")
+            if not separator:
+                raise InputError("--fragment must have the form OFFSET:TEXT")
+            fragments.append((int(offset), text))
+        if not fragments and not args.drag:
+            raise InputError("crib recovery requires --fragment or --drag")
+        if args.drag and args.wordlist:
+            raise InputError("choose a fixed crib placement before adding --wordlist")
+        text = _resolve_text(args)
+        if args.drag:
+            result = drag_additive_crib(
+                text,
+                args.periods,
+                args.drag,
+                fragments=fragments,
+                alphabet=alpha,
+                max_placements=args.max_placements,
+            )
+        else:
+            result = solve_additive_crib(text, args.periods, fragments, alphabet=alpha)
+            if args.wordlist and result["consistent"]:
+                with open(args.wordlist, encoding="utf-8") as words_file:
+                    result["word_recovery"] = recover_word_keys(
+                        result["keystream"],
+                        args.periods,
+                        words_file,
+                        alphabet=alpha,
+                        max_nodes=args.max_nodes,
+                        max_results=args.max_results,
+                    )
+    print(
+        json.dumps(
+            {"ok": True, "operation": "additive-" + args.action, "result": result},
+            ensure_ascii=False,
+            indent=None if args.compact else 2,
+        )
+    )
+    incomplete = result.get("status") in ("inconsistent", "capped") or result.get(
+        "word_recovery", {}
+    ).get("capped", False)
+    return 1 if incomplete else 0
+
+
 def _cmd_crib(args) -> int:
     from . import crib as crib_mod
 
@@ -1674,6 +1754,27 @@ def build_parser() -> argparse.ArgumentParser:
             p.add_argument("--file", help="read input from a file")
         p.add_argument("-j", "--json", action="store_true", help="emit JSON")
         p.add_argument("--compact", action="store_true", help="single-line JSON")
+
+    # Exact additive-sum recovery; no language model or cipher identification implied.
+    p = sub.add_parser("additive", help="analyze or crib-solve sums of periodic keys")
+    p.add_argument("action", choices=("analyze", "crib", "words", "bank"))
+    add_io(p)
+    p.add_argument(
+        "--periods", type=int, nargs="+", help="component periods, including shared factors"
+    )
+    p.add_argument("--alphabet", default="STANDARD", help="alphabet name or 26-letter permutation")
+    p.add_argument(
+        "--fragment", action="append", help="fixed crib OFFSET:TEXT; repeat for fragments"
+    )
+    p.add_argument("--drag", help="try a floating crib at each letter offset")
+    p.add_argument("--max-placements", type=int, default=1000, help="floating-crib placement limit")
+    p.add_argument("--wordlist", help="UTF-8 dictionary, one word per line")
+    p.add_argument("--pad", help="known keystream indices separated by commas; ? denotes unknown")
+    p.add_argument("--max-nodes", type=int, default=1000000, help="dictionary work limit")
+    p.add_argument("--max-results", type=int, default=100, help="dictionary result limit")
+    p.add_argument("--min-length", type=int, default=1, help="minimum word length for bank audit")
+    p.add_argument("--max-length", type=int, help="maximum word length for bank audit")
+    p.set_defaults(func=_cmd_additive)
 
     # encode / decode
     for name, fn in (("encode", _cmd_encode), ("decode", _cmd_decode)):

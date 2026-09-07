@@ -153,6 +153,7 @@ Errors never dump a traceback. With `--json` they return `{"ok": false, "error":
 | `butt identify [text] [--types]` | Classify likely cipher family, or specific types (`--types`) |
 | `butt diagnose [text]` | One-shot layered/composite structure triage → verdict + recommended attacks |
 | `butt stats [text] [--contacts] [--significance] [--family]` | Frequency / IoC / per-letter chi-squared / digraph / Kasiski / period & repeated-bigram detectors (+ vowel-finder); `--family` adds the look-elsewhere-corrected significance of the strongest period |
+| `butt additive {analyze,crib,words,bank}` | Exact periodic-key sum recovery, bounded word decomposition, and candidate audits ([guide](docs/additive-keys.md)) |
 | `butt compare [ct_a] --with ct_b` | Sibling-pair analysis: do two ciphertexts share a construction? (frequency profile, period/kappa signature, additive superimposition) |
 | `butt nonprose [text]` | Flag a candidate that scores like English but reads as a route/coordinates/list (structured non-prose payload) |
 | `butt keyword [text]` | Recover the keyword from a keyed alphabet or square |
